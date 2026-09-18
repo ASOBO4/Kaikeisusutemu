@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>本格POSレジシステム V57 (Final - Optimized Sync)</title>
+    <title>本格POSレジシステム V57 (Auto-Sync Edition)</title>
     <style>
         :root { 
             --primary: #007aff; 
@@ -112,8 +112,8 @@
         .ios-toggle-row { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--bg-main); border-radius:12px; margin-top:12px; }
         .ios-toggle { position:relative; width:50px; height:30px; appearance:none; background:#d1d1d6; border-radius:30px; outline:none; cursor:pointer; transition:0.3s; flex-shrink: 0; }
         .ios-toggle:checked { background:var(--success); }
-        .ios-toggle::after { content:""; position:absolute; top:2px; left:2px; width:26px; height:26px; background:white; border-radius:50%; transition:0.3s; box-shadow:0 2px 5px rgba(0,0,0,0.2); }
         .ios-toggle:checked::after { transform:translateX(20px); }
+        .ios-toggle::after { content:""; position:absolute; top:2px; left:2px; width:26px; height:26px; background:white; border-radius:50%; transition:0.3s; box-shadow:0 2px 5px rgba(0,0,0,0.2); }
 
         .settings-list { display: flex; flex-direction: column; background: #fff; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 20px; }
         .settings-item { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--bg-main); gap: 12px; }
@@ -639,7 +639,13 @@
         let currentLogSource = 'online'; 
         let filteredLogsForView = [];
         
-        let syncConfig = { dbUrl: '', syncId: '', enabled: false };
+        // ★ ここにあらかじめ同期用のURLと同期IDを組み込み・自動有効化 ★
+        let syncConfig = { 
+            dbUrl: 'https://your-firebase-app-default-rtdb.firebaseio.com', // ←ここに実際のFirebase URLを入力
+            syncId: 'A1B2C3',                                              // ←ここに同期IDを入力
+            enabled: true 
+        };
+        
         let syncPollTimer = null;
         let isSyncReady = false; 
         let lastKnownUpdatedAt = 0; 
@@ -713,7 +719,10 @@
         };
 
         function loadSyncConfig() { 
-            try { const s = JSON.parse(localStorage.getItem('posSyncConfig_V42')); if(s) syncConfig = s; } catch(e){} 
+            try { 
+                const s = JSON.parse(localStorage.getItem('posSyncConfig_V42')); 
+                if(s && s.dbUrl) syncConfig = s; 
+            } catch(e){} 
             if(document.getElementById('syncDbUrlInput')) document.getElementById('syncDbUrlInput').value = syncConfig.dbUrl || ''; 
             if(document.getElementById('syncIdInput')) document.getElementById('syncIdInput').value = syncConfig.syncId || ''; 
             updateSyncStatusUI(); 
@@ -1475,7 +1484,7 @@
                     const l = viewLogs[idx]; const isProvided = l.provided || (state.providedTickets && state.providedTickets[`${l.ticket}_${l.timestamp}`]);
                     let cost = 0; const itemsStr = l.items.map(i => { const p = state.products.find(x => x.name === i.name.split(' (+')[0]); const unitCost = p ? p.cost : 0; cost += unitCost * i.qty; return `<div style="margin-bottom:2px;">${i.name} ×${i.qty}</div>`; }).join('');
                     const profit = l.total - cost; const dateFmt = l.timestamp ? new Date(l.timestamp).toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : l.time; const methodHtml = l.method==='cash' ? '<span style="color:var(--text-side); font-weight:800;">💴 現金</span>' : '<span style="color:var(--primary); font-weight:800;">📱 PayPay</span>'; const provHtml = isProvided ? '<span style="background:var(--success); color:#fff; padding:4px 8px; font-size:10px; border-radius:6px; font-weight:900;">提供済</span>' : '<span style="background:var(--accent); color:#fff; padding:4px 8px; font-size:10px; border-radius:6px; font-weight:900;">調理中</span>';
-                    html += `<tr style="border-bottom:1px solid #e2e8f0;"><td style="font-size:13px; font-weight:800; color:var(--text-side);">${dateFmt}</td><td style="font-weight:900; text-align:center; font-size:16px;">${l.ticket}</td><td>${methodHtml}<br><div style="margin-top:6px;">${provHtml}</div></td><td style="font-size:13px; font-weight:800; line-height:1.4;">${itemsStr}</td><td style="font-weight:900; color:var(--primary); text-align:right; font-size:15px;">¥${l.total.toLocaleString()}</td><td style="font-weight:800; color:var(--text-side); text-align:right; font-size:14px;">¥${cost.toLocaleString()}</td><td style="font-weight:900; color:var(--success); text-align:right; font-size:15px;">¥${profit.toLocaleString()}</td><td style="text-align:center;">${l.deviceId===myDeviceId ? `<button class="action-btn cancel-btn" style="padding:6px 12px; font-size:12px; margin:0; width:auto; border-radius:8px;" onclick="deleteAdminLog(${l.ticket}, ${l.timestamp})">取消</button>` : '<span style="font-size:11px; font-weight:800; color:var(--text-side); background:var(--bg-main); padding:4px 8px; border-radius:6px;">他端末</span>'}</td></tr>`;
+                    html += `<tr style="border-bottom:1px solid #e2e8f0;"><td style="font-size:13px; font-weight:800; color:var(--text-side);">${dateFmt}</td><td style="font-weight:900; text-align:center; font-size:16px;">${l.ticket}</td><td>${methodHtml}<br><div style="margin-top:6px;">${provHtml}</div></td><td style="font-size:13px; font-weight:800; line-height:1.4;">${itemsStr}</td><td style="font-weight:900; color:var(--primary); text-align:right; font-size:15px;">¥${l.total.toLocaleString()}</td><td style="font-weight:800; color:var(--text-side); text-align:right; font-size:14px;">¥${cost.toLocaleString()}</td><td style="font-weight:900; color:var(--success); text-align:right; font-size:15px;">¥${profit.toLocaleString()}</td><td style="text-align:center;">${l.deviceId===myDeviceId ? `<button class="action-btn cancel-btn" style="padding:6px 12px; font-size:12px; margin:0; width:auto; border-radius:8px;" onclick="deleteAdminLog(${l.ticket},${l.timestamp})">取消</button>` : '<span style="font-size:11px; font-weight:800; color:var(--text-side); background:var(--bg-main); padding:4px 8px; border-radius:6px;">他端末</span>'}</td></tr>`;
                 }
                 viewLogs.forEach(l => { let c = 0; l.items.forEach(i => { const p = state.products.find(x => x.name === i.name.split(' (+')[0]); c += (p ? p.cost : 0) * i.qty; }); sumSales += l.total; sumCost += c; sumProfit += (l.total - c); });
                 if (viewLogs.length > 1000) html += `<tr><td colspan="8" style="text-align:center; padding:15px; font-weight:800; color:var(--text-side);">※表示上限(1000件)を超過しています。絞り込みをご利用ください。集計は全${viewLogs.length}件を計算済です。</td></tr>`;
