@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>本格POSレジシステム V63-stable</title>
+    <title>本格POSレジシステム V68-stable (同期堅牢化版)</title>
     <style>
         :root { 
             --primary: #007aff; 
@@ -34,8 +34,13 @@
         
         .app-body { display: flex; flex: 1; overflow: hidden; position: relative; }
         .main-pane { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; background: var(--bg-main); position: relative; }
-        .cart-pane, .checkout-pane { width: 420px; background: var(--bg-side); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; position: relative; }
-        .checkout-pane { overflow-y: auto; }
+        
+        .cart-pane { width: 340px; background: var(--bg-side); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; position: relative; }
+        
+        .checkout-pane { width: 520px; background: var(--bg-side); border-left: 1px solid var(--border); overflow: hidden; height: 100%; display: flex; flex-direction: column; z-index: 10; position: relative; }
+        .checkout-top-area { padding: 12px 16px 8px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; }
+        .checkout-numpad-area { flex: 1; padding: 6px 16px 20px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        
         .handover-pane { flex: 1; padding: 20px; background: var(--bg-main); display: none; flex-direction: column; overflow: hidden; }
         
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--glass-bg); padding: 15px 25px; border-radius: 16px; box-shadow: var(--shadow-sm); border: 1px solid rgba(0,0,0,0.05); z-index: 105; flex-shrink: 0; }
@@ -66,7 +71,7 @@
         .total-display { font-size: 56px; font-weight: 900; text-align: right; margin-bottom: 0; letter-spacing: -2px; }
         .action-btn { width: 100%; background: var(--success); color: white; border: none; padding: 20px; font-size: 22px; font-weight: 800; border-radius: 16px; cursor: pointer; margin-bottom: 10px; transition: transform 0.08s ease-out; box-shadow: 0 4px 12px rgba(52,199,89,0.25); }
         .action-btn:active:not(:disabled) { transform: scale(0.96); }
-        .action-btn:disabled { background: #d1d1d6; color: #8e8e93; cursor: not-allowed; box-shadow: none; }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; transform: none !important; }
         .cancel-btn { background: #e5e5ea; color: #ff3b30; box-shadow: none; }
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(3px); z-index: 1000; justify-content: center; align-items: center; }
@@ -79,16 +84,12 @@
         .swipe-pill { width: 44px; height: 5px; background: #b0b0b8; border-radius: 99px; margin-bottom: 3px; }
         .swipe-text { font-size: 12px; font-weight: 800; color: var(--text-side); display: flex; align-items: center; gap: 4px; }
         
-        .tenkey-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 0; }
-        .tk-btn { height: 115px; font-size: 46px; font-weight: 800; border: none; border-radius: 20px; background: #f2f2f7; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 3px 8px rgba(0,0,0,0.08); transition: transform 0.08s; }
-        .tk-btn:active:not(:disabled) { transform: scale(0.96); background: #e5e5ea; }
-        .tk-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+        .tenkey-grid { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(4, 1fr); gap: 12px; margin-top: 0; min-height: 0; }
+        .tk-btn { height: 100%; min-height: 0; font-size: clamp(26px, 4.5vh, 50px); font-weight: 800; border: none; border-radius: 18px; background: #f2f2f7; cursor: pointer; display: flex; justify-content: center; align-items: center; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.08); transition: transform 0.08s, opacity 0.15s; }
+        .tk-btn:active:not(:disabled) { transform: scale(0.95); background: #e5e5ea; }
+        .tk-btn:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; transform: none !important; }
         
-        .fake-input { font-size: 36px; padding: 15px 20px; border: 2px solid var(--border); border-radius: 14px; text-align: right; font-weight: 900; background: #ffffff; cursor: pointer; }
-        .pay-method-box { display: flex; gap: 12px; margin-bottom: 20px; }
-        .pay-btn { flex: 1; padding: 22px; font-size: 22px; border: 2px solid transparent; border-radius: 16px; background: #e5e5ea; cursor: pointer; font-weight: 800; transition: all 0.15s; }
-        .pay-btn.active { border-color: var(--primary); background: rgba(0, 122, 255, 0.1); color: var(--primary); }
-        .pay-btn:active { transform: scale(0.96); }
+        .fake-input { font-size: 30px; padding: 8px 14px; border: 2px solid var(--border); border-radius: 12px; text-align: right; font-weight: 900; background: #ffffff; cursor: pointer; }
         
         .ho-layout { display: flex; flex: 1; gap: 20px; overflow: hidden; padding: 0; }
         .ho-list-area { flex: 1; overflow-y: auto; padding-right: 10px; align-content: flex-start; }
@@ -212,42 +213,64 @@
                 <span>🛒 カート内容</span>
                 <button class="action-btn cancel-btn" id="btnClearCart" style="width:auto; margin:0; padding:8px 16px; font-size:14px; border-radius:10px;">クリア</button>
             </div>
-            <div style="padding:16px 22px; border-bottom:1px solid var(--border); background:var(--bg-main);">
-                <div style="color: var(--text-side); font-weight:800; font-size:13px; text-transform:uppercase;">合計請求金額</div>
-                <div class="total-display">¥<span id="cartTotal">0</span></div>
-            </div>
+            
             <ul class="cart-list" id="cartList"></ul>
+            
+            <div style="padding:16px 20px; border-top:1px solid var(--border); background:var(--bg-main); display:flex; flex-direction:column; flex-shrink: 0;">
+                <div>
+                    <div style="color: var(--text-side); font-weight:900; font-size:14px; text-transform:uppercase; margin-bottom:4px;">合計請求金額</div>
+                    <div class="total-display" style="font-size:50px; line-height:1; margin-bottom:0;">¥<span id="cartTotal">0</span></div>
+                </div>
+            </div>
         </div>
 
+        <!-- レジペイン -->
         <div class="checkout-pane" id="checkoutPanel">
             <div class="swipe-history-handle" id="checkoutSwipeHandle" onclick="openTicketDetailModal()">
                 <div class="swipe-pill"></div>
                 <div class="swipe-text"><span>↓ 下スワイプまたはタップで全注文履歴 (取消)</span></div>
             </div>
-            <div style="padding:18px 20px 0;">
-                <div class="pay-method-box">
-                    <button class="pay-btn active" id="pmCash" onclick="setPayMethod('cash')">💴 現金</button>
-                    <button class="pay-btn" id="pmCashless" onclick="setPayMethod('cashless')">📱 PayPay</button>
+            
+            <div class="checkout-top-area">
+                <div id="cashFields" style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="background:#fff; padding:10px 16px; border-radius:12px; border:2px solid var(--border);">
+                        <div style="color:var(--text-side); font-weight:900; font-size:14px; margin-bottom:4px;">お預かり金額</div>
+                        <div class="fake-input" id="amountBar" style="font-size:40px; padding:0; border:none; text-align:right; min-height:45px;">¥0</div>
+                    </div>
+                    <div style="background:var(--bg-main); padding:12px 16px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:18px; color:var(--text-side); font-weight:900;" id="changeLabel">お釣り</span>
+                        <span id="changeDisplay" style="color:var(--success); font-size:36px; font-weight:900;">¥0</span>
+                    </div>
                 </div>
-                <div id="cashFields">
-                    <div style="color:var(--text-side); font-weight:800; font-size:13px; margin-bottom:6px;">お預かり金額</div>
-                    <div class="fake-input" id="amountBar" style="font-size:34px; margin-bottom:8px; cursor:default;">¥0</div>
-                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-bottom:12px;">
-                        <button class="sys-btn" style="padding:10px 2px; font-size:13px; font-weight:900; background:#e5e5ea; border-radius:10px;" onclick="setCashExact()">ぴったり</button>
-                        <button class="sys-btn" style="padding:10px 2px; font-size:13px; font-weight:900; background:#e5e5ea; border-radius:10px;" onclick="quickAmount(1000)">+1千</button>
-                        <button class="sys-btn" style="padding:10px 2px; font-size:13px; font-weight:900; background:#e5e5ea; border-radius:10px;" onclick="quickAmount(5000)">+5千</button>
-                        <button class="sys-btn" style="padding:10px 2px; font-size:13px; font-weight:900; background:#e5e5ea; border-radius:10px;" onclick="quickAmount(10000)">+1万</button>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; font-weight:800; background:var(--bg-main); padding:10px 14px; border-radius:12px;">
-                        <span style="font-size:14px; color:var(--text-side);" id="changeLabel">お釣り</span><span id="changeDisplay" style="color:var(--success); font-size:24px;">¥0</span>
-                    </div>
+                
+                <div id="cashlessFields" style="display:none; flex-direction:column; align-items:center; justify-content:center; background:#fff1f2; border:3px solid #f43f5e; border-radius:16px; padding:20px 20px; gap:10px; height:100%;">
+                    <span style="font-size:20px; font-weight:900; color:#e11d48;">📱 PayPay決済モード</span>
+                    <span style="font-size:14px; font-weight:800; color:#f43f5e;">金額の入力は不要です</span>
                 </div>
             </div>
-            <div style="padding:0 20px;">
+            
+            <div class="checkout-numpad-area">
                 <div class="tenkey-grid" id="checkoutNumpadGrid">
-                    <button class="tk-btn" onclick="numInput('7')">7</button><button class="tk-btn" onclick="numInput('8')">8</button><button class="tk-btn" onclick="numInput('9')">9</button><button class="tk-btn" style="color:var(--accent);" onclick="numInput('C')">C</button><button class="tk-btn" onclick="numInput('4')">4</button><button class="tk-btn" onclick="numInput('5')">5</button><button class="tk-btn" onclick="numInput('6')">6</button><button class="tk-btn" style="grid-row: span 2; height: auto; background: var(--success); color: white;" onclick="confirmCheckout()">確定</button><button class="tk-btn" onclick="numInput('1')">1</button><button class="tk-btn" onclick="numInput('2')">2</button><button class="tk-btn" onclick="numInput('3')">3</button><button class="tk-btn" style="grid-column: span 2;" onclick="numInput('0')">0</button><button class="tk-btn" onclick="quickAmount(1000)">+千</button>
+                    <button class="tk-btn tk-num-btn" style="font-size: clamp(15px, 2.8vh, 22px); color: var(--primary);" onclick="setCashExact()">ぴったり</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('7')">7</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('8')">8</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('9')">9</button>
+                    <button class="tk-btn tk-num-btn" style="color:var(--accent);" onclick="numInput('C')">C</button>
+                    
+                    <button class="tk-btn tk-num-btn" style="font-size: clamp(15px, 2.8vh, 22px); color: var(--primary);" onclick="quickAmount(1000)">+1千円</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('4')">4</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('5')">5</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('6')">6</button>
+                    <button class="tk-btn" style="grid-row: span 3; font-size: clamp(20px, 3.5vh, 32px); background: var(--success); color: white;" onclick="confirmCheckout()" id="btnConfirmCheckout">💴<br>現金で<br>確定</button>
+                    
+                    <button class="tk-btn" style="font-size: clamp(15px, 2.8vh, 20px); grid-row: span 2; background: #eef6ff; color: var(--primary); border: 2px solid #bfdbfe; font-weight: 900; line-height: 1.3;" onclick="togglePayMethod()" id="btnPayToggle">📱<br>PayPay<br>にする</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('1')">1</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('2')">2</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('3')">3</button>
+                    
+                    <button class="tk-btn tk-num-btn" style="grid-column: span 2;" onclick="numInput('0')">0</button>
+                    <button class="tk-btn tk-num-btn" onclick="numInput('00')">00</button>
                 </div>
-                <button class="action-btn" id="cashlessConfirmBtn" style="display:none; background:var(--primary); margin-top:16px; font-size:24px; font-weight:900; padding:26px; border-radius:20px;" onclick="confirmCheckout()">📱 PayPayで確定</button>
             </div>
         </div>
 
@@ -288,6 +311,7 @@
 
                 <div id="adminTabBar">
                     <button class="admin-tab-btn admin-tab-active" onclick="switchAdminTab('analytics')" id="adminTab_analytics">📊 経営・売上分析</button>
+                    <button class="admin-tab-btn" onclick="switchAdminTab('cash')" id="adminTab_cash">💴 現金過不足チェック</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('products')" id="adminTab_products">📦 商品マスター</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('log')" id="adminTab_log">📝 取引データ管理</button>
                     <button class="admin-tab-btn" onclick="switchAdminTab('settings')" id="adminTab_settings">🔐 設定・同期</button>
@@ -307,6 +331,41 @@
                         <div class="analytics-grid-two">
                             <div class="analytics-card"><h3 style="margin:0 0 16px 0;">🏆 商品別 売上ランキング</h3><div class="table-wrap"><table id="analyticsProductTable"><thead><tr><th>商品名</th><th style="text-align:right;">販売数</th><th style="text-align:right;">売上額</th><th style="text-align:right;">粗利益</th></tr></thead><tbody></tbody></table></div></div>
                             <div class="analytics-card"><h3 style="margin:0 0 16px 0;">💳 決済手段</h3><div id="analyticsPaymentStats"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cash Check Section -->
+                <div id="adminSection_cash" class="admin-section" style="display:none;">
+                    <div class="admin-content-wrapper">
+                        <div class="kpi-grid">
+                            <div class="kpi-card"><div class="kpi-title">💴 システム上の現金売上</div><div class="kpi-value" style="color:var(--primary);">¥<span id="cashCheckExpectedSales">0</span></div></div>
+                            <div class="kpi-card"><div class="kpi-title">🧮 実際に数えた現金</div><div class="kpi-value" style="color:var(--success);">¥<span id="cashCheckActualTotal">0</span></div></div>
+                            <div class="kpi-card"><div class="kpi-title">⚖️ 過不足</div><div class="kpi-value" id="cashCheckDiffValue">¥0</div></div>
+                        </div>
+                        <div class="analytics-grid-two">
+                            <div class="analytics-card">
+                                <h3 style="margin:0 0 16px 0;">🧮 現金を数える（タップしてテンキー入力）</h3>
+                                <div style="display:flex; flex-direction:column; gap:6px;" id="cashCheckDenomList"></div>
+                                <div style="margin-top:16px;">
+                                    <button class="sys-btn" onclick="resetCashCheckCount()" style="width:100%;">枚数をリセット</button>
+                                </div>
+                            </div>
+                            <div class="analytics-card">
+                                <h3 style="margin:0 0 16px 0;">⚙️ 釣銭準備金</h3>
+                                <div class="settings-item" style="border:none; padding:0 0 12px 0;">
+                                    <div class="settings-item-left"><div><div style="font-weight:900; font-size:15px;">レジ開始時の釣銭準備金</div><div style="font-size:12px; color:var(--text-side);">営業前にレジへ入れた現金額</div></div></div>
+                                    <div class="settings-item-right">
+                                        <div class="pmc-fake-input" id="cashCheckFloatDisplay" data-val="0" style="width:160px;" onclick="openNumPad('cashFloat', null, '釣銭準備金', document.getElementById('cashCheckFloatDisplay').getAttribute('data-val') || 0, false, false)">¥0</div>
+                                    </div>
+                                </div>
+                                <div style="font-size:13px; font-weight:800; color:var(--text-side); line-height:1.9; background:var(--bg-main); border-radius:12px; padding:12px 16px; border:1px solid var(--border);">
+                                    期待現金額 = 釣銭準備金 + システム上の現金売上<br>
+                                    過不足 = 実際に数えた現金 − 期待現金額<br>
+                                    <span style="color:var(--accent);">※プラスは現金が多い（釣銭の渡し間違い等）、マイナスは少ない状態です。</span><br>
+                                    <span style="color:var(--text-side);">※この画面の入力内容は記録・保存されません。確認用の一時計算ツールです。</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -430,6 +489,12 @@
                                         <option value="sub">サブレジ固定</option>
                                         <option value="viewer">閲覧専用</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-item-left"><div class="settings-icon" style="background:#8b5cf6;">🔰</div><div><div style="font-weight:900; font-size:16px;">初回選択画面</div><div style="font-size:12px; color:var(--text-side);">最初に表示される役割選択画面をもう一度開きます</div></div></div>
+                                <div class="settings-item-right">
+                                    <button class="sys-btn" style="width:100%;" onclick="openFirstTimeRoleModalForce()">選択画面を開く</button>
                                 </div>
                             </div>
                         </div>
@@ -719,6 +784,17 @@
     <div class="modal-overlay" id="receiptModal"><div class="modal-content" style="max-width: 400px;"><div id="receiptContent" style="margin-bottom: 20px;"></div><button class="action-btn" style="margin:0; background: #111827;" onclick="closeReceipt()">確認して戻る</button></div></div>
     <div class="modal-overlay" id="ticketDetailModal"><div class="modal-content" style="max-width: 700px;"><h2 style="margin-top:0;">全注文履歴 (取消)</h2><div style="padding: 15px; max-height: 50vh; overflow:auto; border:1px solid var(--border); border-radius:14px;" id="fullTicketList"></div><button class="action-btn cancel-btn" style="margin-top:20px; margin-bottom:0;" onclick="closeModal('ticketDetailModal')">閉じる</button></div></div>
     
+    <div class="modal-overlay modal-overlay-top" id="firstTimeRoleModal">
+        <div class="modal-content" style="width: 520px; padding: 28px;">
+            <h2 style="margin-top:0; text-align:center;">端末の役割を選択</h2>
+            <p style="text-align:center; font-size:13px; color:var(--text-side); font-weight:800; margin-top:-10px; margin-bottom:20px;">この端末をどのレジとして使いますか？<br>あとから「設定・同期」タブでいつでも変更できます。</p>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="sys-btn blue" onclick="selectFirstRoleAndClose('main')" style="padding:20px; font-size:18px;">🟢 メインレジ (1号機)</button>
+                <button class="sys-btn" onclick="selectFirstRoleAndClose('sub')" style="padding:20px; font-size:18px;">🟠 サブレジ (2号機以降)</button>
+                <button class="sys-btn" onclick="selectFirstRoleAndClose('viewer')" style="padding:20px; font-size:18px;">👁️ 閲覧専用</button>
+            </div>
+        </div>
+    </div>
     <div class="modal-overlay modal-overlay-top" id="universalNumPad">
         <div class="modal-content" style="width: 380px; padding: 25px;"><h2 id="unpTitle" style="text-align: center; margin-top:0; font-size: 24px; font-weight: 800;">入力</h2><div class="fake-input" id="unpDisplay" style="margin-bottom: 10px;">0</div>
             <div class="tenkey-grid" style="grid-template-columns: repeat(4, 1fr); gap: 10px;">
@@ -728,9 +804,27 @@
         </div>
     </div>
 
-    <!-- 堅牢化スクリプト -->
     <script>
-        console.log("システム版: V63-stable 起動");
+        // --- DATA-003: localStorage 未使用キーの完全削除 ---
+        function cleanupOldKeys() {
+            const oldKeys = ['posState_V41', 'posLocalLog_V41', 'posSyncConfig_V41', 'posDeviceSettings_V41', 'posHasEverSynced_V41', 'posDeviceId_V41', 'posFirstSeen_V41', 'posPendingDeletions_V41'];
+            oldKeys.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+        }
+        cleanupOldKeys();
+
+        console.log("システム版: V68-stable / 同期堅牢化版 起動");
+
+        // --- 1. グローバルエラーハンドリング ---
+        let lastErrorTime = 0;
+        function logGlobalError(msg) {
+            console.error("System Error:", msg);
+            if (Date.now() - lastErrorTime > 3000) {
+                showToast('予期しないエラーを検知しましたが処理は継続しています', 'error');
+                lastErrorTime = Date.now();
+            }
+        }
+        window.addEventListener('error', (e) => logGlobalError(e.error));
+        window.addEventListener('unhandledrejection', (e) => logGlobalError(e.reason));
 
         // --- 2. 安全な数値とサニタイズ処理 ---
         window.safeNumber = (val, fallback = 0) => {
@@ -747,14 +841,70 @@
             });
         }
 
+        // --- 3. localStorageの安全化 (インメモリフォールバック) ---
+        let memoryStorage = {};
+        function safeSetLocal(key, value) {
+            try {
+                localStorage.setItem(key, value);
+                memoryStorage[key] = value;
+            } catch (e) {
+                memoryStorage[key] = value;
+                showToast('保存容量が不足しています。不要なデータを削除してください', 'error');
+            }
+        }
+        function safeGetLocal(key) {
+            try { return localStorage.getItem(key) || memoryStorage[key] || null; } 
+            catch(e) { return memoryStorage[key] || null; }
+        }
+        function safeRemoveLocal(key) {
+            try { localStorage.removeItem(key); } catch(e) {}
+            delete memoryStorage[key];
+        }
+
+        // --- 4. タイムアウト付き安全なFetch ---
+        async function safeFetch(url, options = {}, timeoutMs = 8000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const res = await fetch(url, { ...options, signal: controller.signal });
+                clearTimeout(id);
+                if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}` };
+                const contentType = res.headers.get('content-type') || '';
+                const data = contentType.includes('application/json') ? await res.json() : null;
+                return { ok: true, data };
+            } catch (error) {
+                clearTimeout(id);
+                return { ok: false, error: error.name === 'AbortError' ? 'Timeout' : error.message };
+            }
+        }
+
+        // --- 互換性ヘルパー関数 ---
+        function getItemBaseName(i) {
+            if (i.name) return parseItemName(i.name).baseName;
+            const p = state.products.find(x => x.id === i.id);
+            return p ? p.name : "不明商品";
+        }
+        function getItemTopping(i) {
+            if (i.name) return parseItemName(i.name).topping;
+            return i.toppingName !== undefined ? i.toppingName : (i.tn || null);
+        }
+        function getItemPrice(i) {
+            if (i.price !== undefined) return i.price;
+            const p = state.products.find(x => x.id === i.id);
+            return (p ? p.price : 0) + (i.toppingPrice !== undefined ? i.toppingPrice : (i.tp || 0));
+        }
+
         // --- 状態変数の初期化 ---
-        const myDeviceId = (() => { let id = localStorage.getItem('posDeviceId_V42'); if (!id) { id = 'dev_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('posDeviceId_V42', id); } return id; })();
-        const myFirstSeen = safeNumber(localStorage.getItem('posFirstSeen_V42') || Date.now());
-        localStorage.setItem('posFirstSeen_V42', myFirstSeen);
+        const myDeviceId = (() => { let id = safeGetLocal('posDeviceId_V42'); if (!id) { id = 'dev_' + Math.random().toString(36).slice(2, 10); safeSetLocal('posDeviceId_V42', id); } return id; })();
+        const myFirstSeen = safeNumber(safeGetLocal('posFirstSeen_V42') || Date.now());
+        safeSetLocal('posFirstSeen_V42', myFirstSeen);
 
         let deviceSettings = { manualRole: 'auto', role: 'auto', regNo: 1, totalRegs: 1, deviceName: '' };
-        let state = { schemaVersion: 1, products: [], settings: {}, providedTickets: {}, activeDevices: {}, dailySummary: { sales: 0, cost: 0, count: 0, cashSales: 0, cashlessSales: 0, cashCount: 0, cashlessCount: 0, productStats: {} } }; 
+        let state = { schemaVersion: 1, products: [], settings: {}, providedTickets: {}, activeDevices: {} }; 
         let localSalesLog = [], mergedSalesLog = [], cart = []; 
+        let lastCashSalesTotal = 0;
+        let cashCheckDenoms = [10000,5000,2000,1000,500,100,50,10,5,1];
+        let cashCheckCounts = {};
         let currentPayMethod = "cash", cashReceived = 0, cashInputString = "0";
         let systemMode = 'cashier';
         
@@ -773,6 +923,8 @@
         
         let handoverSearchStr = "";
         let isSyncing = false; 
+
+        let pendingDeletions = JSON.parse(safeGetLocal('posPendingDeletions_V42') || '[]');
 
         function parseItemName(rawName) {
             if (!rawName) return { baseName: "", topping: null };
@@ -804,10 +956,7 @@
 
         function getProductTotalSold(productId) {
             let total = 0;
-            mergedSalesLog.forEach(l => { l.items.forEach(i => { if (i.id === productId || parseItemName(i.name).baseName === (state.products.find(p=>p.id===productId)?.name)) total += i.qty; }); });
-            if (state.dailySummary && state.dailySummary.productStats && state.dailySummary.productStats[productId]) {
-                total += state.dailySummary.productStats[productId].qty;
-            }
+            mergedSalesLog.forEach(l => { l.items.forEach(i => { if (i.id === productId || getItemBaseName(i) === (state.products.find(p=>p.id===productId)?.name)) total += i.qty; }); });
             return total;
         }
 
@@ -822,7 +971,7 @@
             mergedSalesLog.forEach(l => {
                 let logRole = l.role || ((l.ticket % 2 !== 0) ? 'main' : 'sub');
                 if (logRole === role || (role === 'main' && logRole === 'viewer')) {
-                    l.items.forEach(i => { if (i.id === productId || parseItemName(i.name).baseName === (state.products.find(p=>p.id===productId)?.name)) total += i.qty; });
+                    l.items.forEach(i => { if (i.id === productId || getItemBaseName(i) === (state.products.find(p=>p.id===productId)?.name)) total += i.qty; });
                 }
             });
             return total;
@@ -836,7 +985,7 @@
         }
 
         window.checkSubLock = () => {
-            const hasEverSynced = localStorage.getItem('posHasEverSynced_V42') === 'true';
+            const hasEverSynced = safeGetLocal('posHasEverSynced_V42') === 'true';
             const lockEl = document.getElementById('subLockOverlay');
             const adminPane = document.getElementById('adminPane');
             if (getEffectiveRole() === 'sub' && !hasEverSynced && adminPane.style.display !== 'flex') {
@@ -847,7 +996,7 @@
         };
 
         function markAsSynced() {
-            localStorage.setItem('posHasEverSynced_V42', 'true');
+            safeSetLocal('posHasEverSynced_V42', 'true');
             checkSubLock();
             updateNumberingModeUI();
         }
@@ -855,7 +1004,9 @@
         window.updateNumberingModeUI = () => {
             const badge = document.getElementById('regRoleBadge');
             const topTitle = document.getElementById('mainTopBarTitle');
-            if(topTitle && deviceSettings.deviceName) { topTitle.childNodes[0].nodeValue = `🎪 ${escapeHtml(deviceSettings.deviceName)} `; }
+            if(topTitle && deviceSettings.deviceName) { 
+                topTitle.childNodes[0].nodeValue = `🎪 ${deviceSettings.deviceName} `; 
+            }
 
             const autoStatus = document.getElementById('deviceAutoStatusText');
             const effRole = getEffectiveRole();
@@ -869,7 +1020,7 @@
             if (effRole === 'viewer') {
                 badge.innerText = '👁️ 閲覧専用'; badge.style.background = '#e5e5ea'; badge.style.color = '#1c1c1e'; badge.style.borderColor = '#d1d1d6'; return;
             }
-            const hasEverSynced = localStorage.getItem('posHasEverSynced_V42') === 'true';
+            const hasEverSynced = safeGetLocal('posHasEverSynced_V42') === 'true';
             const isOnline = syncConfig.enabled;
             const isMain = (effRole !== 'sub');
             const isSequential = (deviceSettings.totalRegs === 1);
@@ -897,7 +1048,7 @@
         };
 
         function loadSyncConfig() { 
-            try { const s = JSON.parse(localStorage.getItem('posSyncConfig_V42')); if(s) syncConfig = s; } catch(e){} 
+            try { const s = JSON.parse(safeGetLocal('posSyncConfig_V42')); if(s) syncConfig = s; } catch(e){} 
             if(!syncConfig.dbUrl) syncConfig.dbUrl = 'https://cash-register-system-c2831-default-rtdb.asia-southeast1.firebasedatabase.app';
             if(document.getElementById('syncDbUrlInput')) document.getElementById('syncDbUrlInput').value = syncConfig.dbUrl || ''; 
             if(document.getElementById('syncIdInput')) document.getElementById('syncIdInput').value = syncConfig.syncId || ''; 
@@ -929,11 +1080,15 @@
                 showToast("設定が変更されたため同期を一時停止しました。再度「開始」を押してください。", "info");
             }
 
-            localStorage.setItem('posSyncConfig_V42', JSON.stringify(syncConfig)); 
+            safeSetLocal('posSyncConfig_V42', JSON.stringify(syncConfig)); 
         };
         
         window.generateNewSyncId = () => { 
-            const newId = Math.random().toString(36).slice(2, 8).toUpperCase(); 
+            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+            let newId = '';
+            for(let i = 0; i < 6; i++) {
+                newId += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
             document.getElementById('syncIdInput').value = newId; 
             saveSyncConfigState(); 
             showToast(`ID [${newId}] を自動発行しました`, 'success'); 
@@ -958,58 +1113,60 @@
                 [`devices/${myDeviceId}/effectiveRole`]: getEffectiveRole(),
                 [`devices/${myDeviceId}/deviceName`]: deviceSettings.deviceName || myDeviceId
             };
-            if (isProductUpdate) { payload["state/products"] = state.products; }
-            if (state.providedTickets) { Object.keys(state.providedTickets).forEach(ticketKey => { payload[`state/providedTickets/${ticketKey}`] = true; }); }
-            if (state.dailySummary) { payload["state/dailySummary"] = state.dailySummary; }
             
-            try {
-                const res = await fetch(`${syncUrlBase()}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (res.ok) { localStorage.removeItem('syncPending_V42'); lastKnownUpdatedAt = payload.updatedAt; markAsSynced(); }
-                else { localStorage.setItem('syncPending_V42', 'true'); }
-            } catch (e) {
-                localStorage.setItem('syncPending_V42', 'true');
+            // ▼ 修正: 商品マスタをIDごとのパッチ更新に変更
+            if (isProductUpdate) { 
+                state.products.forEach(p => { 
+                    payload[`state/products/${p.id}`] = p; 
+                }); 
             }
+            
+            if (state.providedTickets) { Object.keys(state.providedTickets).forEach(ticketKey => { payload[`state/providedTickets/${ticketKey}`] = true; }); }
+            
+            const res = await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (res.ok) { safeRemoveLocal('syncPending_V42'); lastKnownUpdatedAt = payload.updatedAt; markAsSynced(); }
+            else { safeSetLocal('syncPending_V42', 'true'); }
         }
 
         async function pushSingleLog(newLog) {
             if (!syncConfig.enabled || !syncConfig.dbUrl || !syncConfig.syncId || !isSyncReady) return;
-            try {
-                const res = await fetch(`${syncUrlBase()}/logs/${myDeviceId}/${newLog.timestamp}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newLog) });
-                if (res.ok) { await fetch(`${syncUrlBase()}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: Date.now() }) }); markAsSynced(); } 
-                else { localStorage.setItem('syncPending_V42', 'true'); }
-            } catch (e) {
-                localStorage.setItem('syncPending_V42', 'true');
-            }
+            const res = await safeFetch(`${syncUrlBase()}/logs/${myDeviceId}/${newLog.timestamp}.json`, { method: 'PUT', body: JSON.stringify(newLog) });
+            // ▼ 修正: 2段階目のレスポンスも確認
+            if (res.ok) { 
+                const res2 = await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify({ updatedAt: Date.now() }) }); 
+                if (res2.ok) { markAsSynced(); } else { safeSetLocal('syncPending_V42', 'true'); }
+            } 
+            else { safeSetLocal('syncPending_V42', 'true'); }
         }
 
         async function pushSingleHandover(ticketKey) {
             if (!syncConfig.enabled || !syncConfig.dbUrl || !syncConfig.syncId || !isSyncReady) return;
-            try {
-                const res = await fetch(`${syncUrlBase()}/state/providedTickets.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [ticketKey]: true }) });
-                if (res.ok) { await fetch(`${syncUrlBase()}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updatedAt: Date.now() }) }); } 
-                else { localStorage.setItem('syncPending_V42', 'true'); }
-            } catch (e) {
-                localStorage.setItem('syncPending_V42', 'true');
-            }
+            const res = await safeFetch(`${syncUrlBase()}/state/providedTickets.json`, { method: 'PATCH', body: JSON.stringify({ [ticketKey]: true }) });
+            // ▼ 修正: 2段階目のレスポンスも確認
+            if (res.ok) { 
+                const res2 = await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify({ updatedAt: Date.now() }) }); 
+                if (res2.ok) { markAsSynced(); } else { safeSetLocal('syncPending_V42', 'true'); }
+            } 
+            else { safeSetLocal('syncPending_V42', 'true'); }
         }
 
         function applyRemoteState(remote) {
             if (!remote || (remote.logs === undefined && remote.state === undefined)) return;
             let dataChanged = false;
             
-            if (remote.state && Array.isArray(remote.state.products) && remote.state.products.length > 0) {
-                state.products = remote.state.products.map(rp => { 
-                    const lp = state.products.find(p => p.id === rp.id); 
-                    if (!lp) { return { ...rp, stock: getEffectiveRole() === 'sub' ? safeNumber(rp.subAssigned) : safeNumber(rp.mainAssigned) }; }
-                    let newLocalStock = safeNumber(lp.stock);
-                    if (rp.stockUpdatedAt !== lp.stockUpdatedAt) {
-                        let diffMain = safeNumber(rp.mainAssigned) - safeNumber(lp.mainAssigned);
-                        let diffSub = safeNumber(rp.subAssigned) - safeNumber(lp.subAssigned);
-                        if (getEffectiveRole() === 'sub') newLocalStock += diffSub; else newLocalStock += diffMain;
-                    }
-                    return { ...rp, stock: newLocalStock, mainAssigned: rp.mainAssigned, subAssigned: rp.subAssigned, stockUpdatedAt: rp.stockUpdatedAt }; 
-                });
-                dataChanged = true;
+            // ▼ 修正: 配列・オブジェクト両対応 ＆ 不要なstockマージロジックを削除
+            if (remote.state && remote.state.products) {
+                let remoteProducts = [];
+                if (Array.isArray(remote.state.products)) {
+                    remoteProducts = remote.state.products.filter(Boolean);
+                } else if (typeof remote.state.products === 'object') {
+                    remoteProducts = Object.values(remote.state.products).filter(Boolean);
+                }
+                
+                if (remoteProducts.length > 0) {
+                    state.products = remoteProducts.map(rp => ({ ...rp }));
+                    dataChanged = true;
+                }
             }
             
             if (remote.state && remote.state.providedTickets) {
@@ -1019,12 +1176,6 @@
                 if (newCount !== prevCount) dataChanged = true;
             }
             
-            if (remote.state && remote.state.dailySummary) {
-                if (!state.dailySummary) { state.dailySummary = remote.state.dailySummary; dataChanged = true; }
-                else if ((remote.state.dailySummary.sales || 0) > (state.dailySummary.sales || 0)) {
-                    state.dailySummary = remote.state.dailySummary; dataChanged = true;
-                }
-            }
             if (remote.devices) state.activeDevices = remote.devices;
             
             let allLogs = [];
@@ -1051,49 +1202,51 @@
 
         async function pullOrPushInitial() {
             if (!syncConfig.enabled || !syncConfig.dbUrl || !syncConfig.syncId) return;
-            try {
-                const res = await fetch(`${syncUrlBase()}.json`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data) { applyRemoteState(data); isSyncReady = true; lastKnownUpdatedAt = data.updatedAt || Date.now(); }
-                    else { isSyncReady = true; await pushLocalState(true); }
-                } else {
-                    showToast("初回同期エラー。URLを確認してください", "error");
-                }
-            } catch (e) {
-                showToast("初回同期エラー。ネットワークを確認してください", "error");
+            const res = await safeFetch(`${syncUrlBase()}.json`);
+            if (res.ok && res.data) { applyRemoteState(res.data); isSyncReady = true; lastKnownUpdatedAt = res.data.updatedAt || Date.now(); } 
+            else if (res.ok && !res.data) { isSyncReady = true; await pushLocalState(true); } 
+            else { showToast("初回同期エラー。URLを確認してください", "error"); }
+        }
+
+        async function processPendingDeletions() {
+            if (!syncConfig.enabled || pendingDeletions.length === 0) return;
+            const stillPending = [];
+            for (let del of pendingDeletions) {
+                const res = await safeFetch(`${syncUrlBase()}/logs/${del.deviceId}/${del.timestamp}.json`, { method: 'DELETE' });
+                if (!res.ok) stillPending.push(del);
             }
+            pendingDeletions = stillPending;
+            safeSetLocal('posPendingDeletions_V42', JSON.stringify(pendingDeletions));
+            if (pendingDeletions.length === 0) await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify({ updatedAt: Date.now() }) });
         }
 
         async function pollSync() {
             if (!syncConfig.enabled || !isSyncReady) return;
+            const isAdminOpen = document.getElementById('adminPane').style.display === 'flex' || document.getElementById('adminPane').style.display === 'block';
+            const isCashierScreen = (systemMode === 'cashier') && !isAdminOpen;
+            if (isCashierScreen) return; 
 
-            if (localStorage.getItem('syncPending_V42') === 'true') { await pushLocalState(); return; }
+            await processPendingDeletions();
+
+            if (safeGetLocal('syncPending_V42') === 'true') { await pushLocalState(); return; }
             
-            try {
-                const resUp = await fetch(`${syncUrlBase()}/updatedAt.json`);
-                if(!resUp.ok) { syncRetryCount++; return; }
-                syncRetryCount = 0;
-                
-                const upData = await resUp.json();
-                if (upData && upData > lastKnownUpdatedAt) { 
-                    const resData = await fetch(`${syncUrlBase()}.json`); 
-                    if (resData.ok) {
-                        const remote = await resData.json();
-                        if (remote) {
-                            if (remote.devices && getEffectiveRole() === 'sub') {
-                                const mainDev = Object.values(remote.devices).find(d => d.effectiveRole === 'main' || d.role === 'main');
-                                if (mainDev && mainDev.deviceName && mainDev.deviceName !== deviceSettings.deviceName) {
-                                    deviceSettings.deviceName = mainDev.deviceName; document.getElementById('settingDeviceName').value = deviceSettings.deviceName;
-                                    localStorage.setItem('posDeviceSettings_V42', JSON.stringify(deviceSettings)); showToast("メインレジからデバイス名を同期しました", "info");
-                                }
-                            }
-                            applyRemoteState(remote); lastKnownUpdatedAt = remote.updatedAt; 
+            const resUp = await safeFetch(`${syncUrlBase()}/updatedAt.json`);
+            if(!resUp.ok) { syncRetryCount++; return; }
+            syncRetryCount = 0;
+
+            if (resUp.data && resUp.data > lastKnownUpdatedAt) { 
+                const resData = await safeFetch(`${syncUrlBase()}.json`); 
+                if (resData.ok && resData.data) {
+                    const remote = resData.data;
+                    if (remote.devices && getEffectiveRole() === 'sub') {
+                        const mainDev = Object.values(remote.devices).find(d => d.effectiveRole === 'main' || d.role === 'main');
+                        if (mainDev && mainDev.deviceName && mainDev.deviceName !== deviceSettings.deviceName) {
+                            deviceSettings.deviceName = mainDev.deviceName; document.getElementById('settingDeviceName').value = deviceSettings.deviceName;
+                            safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings)); showToast("メインレジからデバイス名を同期しました", "info");
                         }
                     }
+                    applyRemoteState(remote); lastKnownUpdatedAt = remote.updatedAt; 
                 }
-            } catch(e) {
-                syncRetryCount++;
             }
             updateNumberingModeUI();
         }
@@ -1109,10 +1262,10 @@
         }
 
         window.toggleSync = async (auto = false) => {
-            if (!auto && syncConfig.enabled) { syncConfig.enabled = false; clearTimeout(syncPollTimer); updateSyncStatusUI(); localStorage.setItem('posSyncConfig_V42', JSON.stringify(syncConfig)); updateNumberingModeUI(); return; }
+            if (!auto && syncConfig.enabled) { syncConfig.enabled = false; clearTimeout(syncPollTimer); updateSyncStatusUI(); safeSetLocal('posSyncConfig_V42', JSON.stringify(syncConfig)); updateNumberingModeUI(); return; }
             saveSyncConfigState();
             if(!syncConfig.dbUrl || !syncConfig.syncId) { showToast("URLと同期IDを入力してください", "error"); return; }
-            syncConfig.enabled = true; localStorage.setItem('posSyncConfig_V42', JSON.stringify(syncConfig)); updateSyncStatusUI(); updateNumberingModeUI();
+            syncConfig.enabled = true; safeSetLocal('posSyncConfig_V42', JSON.stringify(syncConfig)); updateSyncStatusUI(); updateNumberingModeUI();
             
             showGlobalLoading("初回同期中...");
             try { await pullOrPushInitial(); startPolling(systemMode === 'handover' ? 300000 : 5000); } finally { hideGlobalLoading(); }
@@ -1125,14 +1278,19 @@
         }
 
         window.safeResetData = async () => {
-            if (syncConfig.enabled && localStorage.getItem('syncPending_V42') === 'true') { showToast("未同期の売上データがあります。オンラインに接続して少し待ってから実行してください。", "error"); return; }
-            if(!confirm("現在の売上データ（取引履歴）をクリアし、新しい同期IDを発行します。\nよろしいですか？")) return;
+            if (syncConfig.enabled && safeGetLocal('syncPending_V42') === 'true') { showToast("未同期の売上データがあります。オンラインに接続して少し待ってから実行してください。", "error"); return; }
+            if(!confirm("現在の売上データ（取引履歴）をクリアし、新しい同期IDを発行します。実行してよろしいですか？")) return;
 
             syncConfig.enabled = false; clearTimeout(syncPollTimer);
-            const newId = Math.random().toString(36).slice(2, 8).toUpperCase(); 
+            
+            const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+            let newId = '';
+            for(let i = 0; i < 6; i++) {
+                newId += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
             syncConfig.syncId = newId; document.getElementById('syncIdInput').value = newId; saveSyncConfigState();
 
-            localSalesLog = []; mergedSalesLog = []; cart = []; state.providedTickets = {}; state.dailySummary = { sales: 0, cost: 0, count: 0, cashSales: 0, cashlessSales: 0, cashCount: 0, cashlessCount: 0, productStats: {} }; isSyncReady = false; localStorage.removeItem('posHasEverSynced_V42');
+            localSalesLog = []; mergedSalesLog = []; cart = []; state.providedTickets = {}; isSyncReady = false; safeRemoveLocal('posHasEverSynced_V42');
             saveDataLocalOnly(); updateSyncStatusUI(); refreshAllUI(); updateNumberingModeUI(); checkSubLock(); 
             
             showToast(`古い売上を消去し、新しいID [${newId}] で再スタートしました`, "success"); toggleSync();
@@ -1146,16 +1304,12 @@
         };
 
         window.executeDataDeletion = async () => {
-            try {
-                const res = await fetch(`${syncUrlBase()}.json`, { method: 'DELETE' });
-                if (res.ok) {
-                    state.products = []; state.providedTickets = {}; state.dailySummary = { sales: 0, cost: 0, count: 0, cashSales: 0, cashlessSales: 0, cashCount: 0, cashlessCount: 0, productStats: {} }; localSalesLog = []; mergedSalesLog = []; cart = []; isSyncReady = false; 
-                    localStorage.removeItem('posHasEverSynced_V42');
-                    saveDataLocalOnly(); refreshAllUI(); updateNumberingModeUI(); checkSubLock(); showToast("データを完全に削除しました", "success"); 
-                } else { showToast("削除に失敗しました", "error"); }
-            } catch(e) {
-                showToast("削除に失敗しました", "error");
-            }
+            const res = await safeFetch(`${syncUrlBase()}.json`, { method: 'DELETE' });
+            if (res.ok) {
+                state.products = []; state.providedTickets = {}; localSalesLog = []; mergedSalesLog = []; cart = []; isSyncReady = false; 
+                safeRemoveLocal('posHasEverSynced_V42');
+                saveDataLocalOnly(); refreshAllUI(); updateNumberingModeUI(); checkSubLock(); showToast("データを完全に削除しました", "success"); 
+            } else { showToast("削除に失敗しました", "error"); }
         }
         
         window.factoryReset = () => {
@@ -1166,9 +1320,8 @@
 
         // --- データマイグレーション ---
         function migrateState(st) {
-            if (!st) return { schemaVersion: 1, products: [], providedTickets: {}, activeDevices: {}, dailySummary: { sales: 0, cost: 0, count: 0, cashSales: 0, cashlessSales: 0, cashCount: 0, cashlessCount: 0, productStats: {} } };
+            if (!st) return { schemaVersion: 1, products: [], providedTickets: {}, activeDevices: {} };
             if (typeof st.schemaVersion === 'undefined') st.schemaVersion = 0;
-            if (!st.dailySummary) st.dailySummary = { sales: 0, cost: 0, count: 0, cashSales: 0, cashlessSales: 0, cashCount: 0, cashlessCount: 0, productStats: {} };
             if (st.schemaVersion < 1) {
                 if (Array.isArray(st.products)) {
                     st.products.forEach(p => {
@@ -1203,28 +1356,62 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadDeviceSettings(); loadSyncConfig(); loadDataLocal(); updatePwdStatusUI(); checkSubLock(); initSwipeHandle();
+            loadDeviceSettings(); loadSyncConfig(); loadDataLocal(); checkFirstTimeRole(); updatePwdStatusUI(); checkSubLock(); initSwipeHandle();
             if (syncConfig.enabled && syncConfig.dbUrl && syncConfig.syncId) toggleSync(true); updateCheckoutPanel(); 
         });
 
+        // --- 初回起動時の役割選択 ---
+        function checkFirstTimeRole() {
+            if (!safeGetLocal('posRoleConfig_V42')) {
+                showModal('firstTimeRoleModal');
+            }
+        }
+        window.openFirstTimeRoleModalForce = () => showModal('firstTimeRoleModal');
+        window.selectFirstRoleAndClose = (role) => {
+            deviceSettings.manualRole = role;
+            deviceSettings.role = role;
+            safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
+            safeSetLocal('posRoleConfig_V42', 'true');
+            const roleSel = document.getElementById('settingManualRole');
+            if (roleSel) roleSel.value = role;
+
+            // サブレジ選択時は稼働台数を自動で2台に切り替え、在庫を半分ずつ再配分する
+            if (role === 'sub' && deviceSettings.totalRegs !== 2) {
+                state.products.forEach(p => {
+                    const remaining = getProductTotalRemaining(p.id); const mainSold = getProductRoleSold(p.id, 'main'); const subSold = getProductRoleSold(p.id, 'sub');
+                    const halfMain = Math.ceil(remaining / 2); const halfSub = Math.floor(remaining / 2);
+                    p.mainAssigned = mainSold + halfMain; p.subAssigned = subSold + halfSub;
+                    p.stockUpdatedAt = Date.now();
+                });
+                deviceSettings.totalRegs = 2;
+                safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
+                const regSel = document.getElementById('settingTotalRegs'); if (regSel) regSel.value = 2;
+                saveDataLocalOnly(); pushLocalState(true); refreshAllUI();
+            }
+
+            applyDeviceRoleUI();
+            closeModal('firstTimeRoleModal');
+            showToast(`役割を「${role === 'auto' ? '自動判定' : (role === 'sub' ? 'サブレジ' : (role === 'viewer' ? '閲覧専用' : 'メインレジ'))}」に設定しました`, "success");
+        };
+
         // 未同期データの離脱警告
         window.addEventListener('beforeunload', (e) => {
-            if (localStorage.getItem('syncPending_V42') === 'true') {
+            if (safeGetLocal('syncPending_V42') === 'true' || pendingDeletions.length > 0) {
                 e.preventDefault(); e.returnValue = ''; 
             }
         });
 
-        window.attemptAdminEntry = () => { closeSideDrawer(); const pwd = localStorage.getItem('posAdminPassword_V42'); if (pwd) openNumPad('auth', null, 'パスワードを入力 (p〜も可)', '', true, false); else showAdminPane(); };
-        window.updatePwdStatusUI = () => { const pwd = localStorage.getItem('posAdminPassword_V42'); const el = document.getElementById('pwdStatusText'); if(el) el.innerText = pwd ? '🟢 設定済み' : '⚪ 未設定 (パスワードなし)'; };
+        window.attemptAdminEntry = () => { closeSideDrawer(); const pwd = safeGetLocal('posAdminPassword_V42'); if (pwd) openNumPad('auth', null, 'パスワードを入力 (p〜も可)', '', true, false); else showAdminPane(); };
+        window.updatePwdStatusUI = () => { const pwd = safeGetLocal('posAdminPassword_V42'); const el = document.getElementById('pwdStatusText'); if(el) el.innerText = pwd ? '🟢 設定済み' : '⚪ 未設定 (パスワードなし)'; };
 
         window.updateManualRole = () => {
             deviceSettings.manualRole = document.getElementById('settingManualRole').value;
-            localStorage.setItem('posDeviceSettings_V42', JSON.stringify(deviceSettings));
+            safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
             applyDeviceRoleUI(); pushLocalState(); showToast("役割設定を更新しました", "success");
         }
         
         function loadDeviceSettings() { 
-            try { const s = JSON.parse(localStorage.getItem('posDeviceSettings_V42')); if(s) deviceSettings = { ...deviceSettings, ...s }; } catch(e){} 
+            try { const s = JSON.parse(safeGetLocal('posDeviceSettings_V42')); if(s) deviceSettings = { ...deviceSettings, ...s }; } catch(e){} 
             const regSel = document.getElementById('settingTotalRegs'); if(regSel) regSel.value = deviceSettings.totalRegs || 1;
             const roleSel = document.getElementById('settingManualRole');
             if(roleSel) { if(deviceSettings.manualRole === undefined) deviceSettings.manualRole = deviceSettings.role || 'auto'; roleSel.value = deviceSettings.manualRole; }
@@ -1236,7 +1423,7 @@
         window.updateDeviceName = () => {
             const nameInput = document.getElementById('settingDeviceName');
             if(nameInput) {
-                deviceSettings.deviceName = nameInput.value.trim(); localStorage.setItem('posDeviceSettings_V42', JSON.stringify(deviceSettings));
+                deviceSettings.deviceName = nameInput.value.trim(); safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
                 showToast("デバイス名を保存しました", "success"); updateNumberingModeUI(); pushLocalState();
             }
         };
@@ -1254,10 +1441,10 @@
                         else { const halfMain = Math.ceil(remaining / 2); const halfSub = Math.floor(remaining / 2); p.mainAssigned = mainSold + halfMain; p.subAssigned = subSold + halfSub; }
                         p.stockUpdatedAt = Date.now();
                     });
-                    deviceSettings.totalRegs = newRegs; localStorage.setItem('posDeviceSettings_V42', JSON.stringify(deviceSettings));
+                    deviceSettings.totalRegs = newRegs; safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
                     saveDataLocalOnly(); pushLocalState(true); refreshAllUI(); showToast(`在庫を${newRegs}台運用として再配分しました`, "success");
                 } else { document.getElementById('settingTotalRegs').value = oldRegs; return; }
-            } else { deviceSettings.totalRegs = newRegs; localStorage.setItem('posDeviceSettings_V42', JSON.stringify(deviceSettings)); }
+            } else { deviceSettings.totalRegs = newRegs; safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings)); }
             updateNumberingModeUI();
         };
 
@@ -1266,7 +1453,6 @@
         window.toggleFullScreen = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else if (document.exitFullscreen) document.exitFullscreen(); };
         function showModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        // レジ画面からも正しくリストを描画してから開く
         window.openTicketDetailModal = () => { renderFullTicketList(); showModal('ticketDetailModal'); };
         window.showToast = (msg, type = 'info') => {
             const c = document.getElementById('toastContainer'), el = document.createElement('div'); el.className = 'toast ' + type; el.textContent = msg; c.appendChild(el);
@@ -1285,26 +1471,27 @@
         };
         function updateUnpDisplay() { document.getElementById('unpDisplay').innerText = unpContext.isPassword ? "*".repeat(unpContext.value.length) : unpContext.value || "0"; }
         window.unpConfirm = () => {
-            const val = unpContext.value; const pwd = localStorage.getItem('posAdminPassword_V42');
+            const val = unpContext.value; const pwd = safeGetLocal('posAdminPassword_V42');
             const isAuthorized = val === "0253" || (pwd && val === pwd) || (!pwd && val === "");
             if (unpContext.type === 'auth') { if(isAuthorized) { closeModal('universalNumPad'); showAdminPane(); } else { showToast('パスワードが異なります', 'error'); unpContext.value=""; updateUnpDisplay(); } }
-            else if (unpContext.type === 'setAuth') { localStorage.setItem('posAdminPassword_V42', val); closeModal('universalNumPad'); updatePwdStatusUI(); showToast(val ? 'パスワードを設定しました' : 'パスワードを解除しました', 'success'); }
+            else if (unpContext.type === 'setAuth') { safeSetLocal('posAdminPassword_V42', val); closeModal('universalNumPad'); updatePwdStatusUI(); showToast(val ? 'パスワードを設定しました' : 'パスワードを解除しました', 'success'); }
             else if (unpContext.type === 'deleteAuth') { if(isAuthorized) { closeModal('universalNumPad'); executeDataDeletion(); } else { showToast('パスワードが異なります', 'error'); unpContext.value=""; updateUnpDisplay(); } }
             else if (unpContext.type === 'osmQty') { const qty = safeNumber(val); if(qty>0) setOsmQty(qty); closeModal('universalNumPad'); }
             else if (unpContext.type === 'newToppingPrice') { const pDiv = document.getElementById('newToppingPriceDisplay'); if (pDiv) { pDiv.innerText = `¥${safeFormat(val)}`; pDiv.setAttribute('data-price', safeNumber(val)); } closeModal('universalNumPad'); }
             else if (unpContext.type === 'toppingRowPrice') { const i = unpContext.targetId; if (currentToppingEdit[i]) currentToppingEdit[i].priceAdd = safeNumber(val) || 0; renderToppingModalList(); closeModal('universalNumPad'); }
             else if (unpContext.type === 'invAmt') { const v = safeNumber(val) || 0; document.getElementById('invModalAmt').innerText = v; document.getElementById('invModalAmt').setAttribute('data-val', v); closeModal('universalNumPad'); }
+            else if (unpContext.type === 'cashDenom') { updateCashCheckCount(unpContext.targetId, safeNumber(val) || 0); closeModal('universalNumPad'); }
+            else if (unpContext.type === 'cashFloat') { const el = document.getElementById('cashCheckFloatDisplay'); const v = safeNumber(val) || 0; if (el) { el.innerText = '¥' + safeFormat(v); el.setAttribute('data-val', v); } renderCashCheck(); closeModal('universalNumPad'); }
             else if (unpContext.type.startsWith('admin')) { const el = document.getElementById(`${unpContext.type.replace('admin','').toLowerCase()}_display_${unpContext.targetId}`); if(el) { el.innerText = val; el.setAttribute('data-val', val); } closeModal('universalNumPad'); }
         };
 
         function loadDataLocal() {
             try { 
-                const st = JSON.parse(localStorage.getItem('posState_V42')), lg = JSON.parse(localStorage.getItem('posLocalLog_V42')); 
+                const st = JSON.parse(safeGetLocal('posState_V42')), lg = JSON.parse(safeGetLocal('posLocalLog_V42')); 
                 if(st) state = migrateState(st);
                 if(lg) localSalesLog = lg; 
             } catch(e){}
             if (!state.providedTickets) state.providedTickets = {}; 
-            if (!state.dailySummary) state.dailySummary = { sales: 0, cost: 0, count: 0, cashSales: 0, cashlessSales: 0, cashCount: 0, cashlessCount: 0, productStats: {} };
             if (state.products.length === 0) state.products = [ 
                 { id: 1, name: "特製焼きそば", price: 500, cost: 200, useStock: true, mainAssigned: 100, subAssigned: 0, stockUpdatedAt: Date.now(), stock: 100, active: true, useTopping: true, toppings: [{name:"目玉焼き", priceAdd:100}] },
                 { id: 2, name: "フランクフルト", price: 300, cost: 120, useStock: true, mainAssigned: 100, subAssigned: 0, stockUpdatedAt: Date.now(), stock: 100, active: true, useTopping: false, toppings: [] }
@@ -1313,10 +1500,9 @@
         }
         function saveDataLocalOnly() {
             try {
-                localStorage.setItem('posState_V42', JSON.stringify(state));
-                localStorage.setItem('posLocalLog_V42', JSON.stringify(localSalesLog));
+                safeSetLocal('posState_V42', JSON.stringify(state));
+                safeSetLocal('posLocalLog_V42', JSON.stringify(localSalesLog));
             } catch(e) {
-                // ストレージ容量不足などで保存失敗した場合に通知
                 showToast('⚠️ データ保存失敗: ストレージ容量が不足している可能性があります', 'error');
                 console.error('localStorage保存エラー:', e);
             }
@@ -1341,7 +1527,7 @@
                     renderHandover();
                 } else {
                     if (syncConfig.enabled) {
-                        if (localStorage.getItem('syncPending_V42') === 'true') { document.getElementById('loadingText').innerText = "未送信データを送信中..."; await pushLocalState(); }
+                        if (safeGetLocal('syncPending_V42') === 'true') { document.getElementById('loadingText').innerText = "未送信データを送信中..."; await pushLocalState(); }
                         document.getElementById('loadingText').innerText = "最新データを取得中..."; await pollSync(); startPolling(5000); 
                     }
                     systemMode = 'cashier'; document.getElementById('mainPane').style.display = 'flex'; document.getElementById('cartPane').style.display = 'flex'; document.getElementById('checkoutPanel').style.display = 'flex'; document.getElementById('handoverPane').style.display = 'none'; document.getElementById('menuToggleModeBtn').innerText = '🍳 提供画面へ切り替え';
@@ -1354,7 +1540,8 @@
         window.hideAdminPane = () => { document.getElementById('adminPane').style.display = 'none'; if(systemMode === 'cashier') { document.getElementById('mainPane').style.display = 'flex'; document.getElementById('cartPane').style.display = 'flex'; document.getElementById('checkoutPanel').style.display = 'flex'; } else { document.getElementById('handoverPane').style.display = 'flex'; } checkSubLock(); };
         
         window.switchAdminTab = (tab) => {
-            ['analytics','products','log','settings'].forEach(t => { const sec = document.getElementById('adminSection_'+t); const btn = document.getElementById('adminTab_'+t); if(sec) sec.style.display = t === tab ? 'flex' : 'none'; if(btn) btn.classList.toggle('admin-tab-active', t === tab); });
+            ['analytics','cash','products','log','settings'].forEach(t => { const sec = document.getElementById('adminSection_'+t); const btn = document.getElementById('adminTab_'+t); if(sec) sec.style.display = t === tab ? 'flex' : 'none'; if(btn) btn.classList.toggle('admin-tab-active', t === tab); });
+            if (tab === 'cash') renderCashCheck();
             if(tab === 'log') { updateLogDateFilterOptions(); applyLogFilters(); }
             document.getElementById('adminContentArea').scrollTo(0, 0); 
         };
@@ -1362,13 +1549,7 @@
         window.openSalesSummary = () => {
             closeSideDrawer(); const content = document.getElementById('salesSummaryContent');
             let tally = {}; state.products.forEach(p => { tally[p.id] = { name: p.name, sold: 0, stock: getProductTotalRemaining(p.id) }; });
-            mergedSalesLog.forEach(l => { l.items.forEach(i => { const pId = i.id || state.products.find(x=>x.name===parseItemName(i.name).baseName)?.id; if (pId && tally[pId]) tally[pId].sold += i.qty; }); });
-            if (state.dailySummary && state.dailySummary.productStats) {
-                Object.keys(state.dailySummary.productStats).forEach(pId => {
-                    const id = Number(pId) || pId;
-                    if (tally[id]) tally[id].sold += state.dailySummary.productStats[pId].qty;
-                });
-            }
+            mergedSalesLog.forEach(l => { l.items.forEach(i => { const pId = i.id || state.products.find(x=>x.name===getItemBaseName(i))?.id; if (pId && tally[pId]) tally[pId].sold += i.qty; }); });
             let html = '<div style="background:#f8fafc; border-radius:12px; border:1px solid var(--border); overflow:hidden;"><table style="width:100%; border-collapse:collapse; font-size:16px;"><thead><tr><th style="padding:14px 16px; background:#e2e8f0; border-bottom:2px solid var(--border); text-align:left;">商品名</th><th style="padding:14px 16px; background:#e2e8f0; border-bottom:2px solid var(--border); text-align:right;">販売数</th><th style="padding:14px 16px; background:#e2e8f0; border-bottom:2px solid var(--border); text-align:right;">残り在庫</th></tr></thead><tbody>';
             Object.values(tally).sort((a,b) => b.sold - a.sold).forEach(t => { html += `<tr><td style="padding:14px 16px; border-bottom:1px solid #e2e8f0; font-weight:800;">${escapeHtml(t.name)}</td><td style="padding:14px 16px; border-bottom:1px solid #e2e8f0; text-align:right; font-weight:900; color:var(--primary);">${safeFormat(t.sold)}</td><td style="padding:14px 16px; border-bottom:1px solid #e2e8f0; text-align:right; font-weight:900; color:${t.stock > 0 ? 'var(--success)' : 'var(--accent)'};">${safeFormat(t.stock)}</td></tr>`; });
             html += '</tbody></table></div>';
@@ -1446,12 +1627,59 @@
         document.getElementById('btnClearCart').addEventListener('click', () => { cart = []; renderCart(); });
         function getCartTotal() { return cart.reduce((sum, c) => { const p = state.products.find(x=>x.id===c.id); return sum + (p ? (p.price + (c.toppingPrice || 0)) * c.qty : 0); }, 0); }
 
-        window.setPayMethod = (m) => { 
-            currentPayMethod = m; document.getElementById('pmCash').classList.toggle('active', m==='cash'); document.getElementById('pmCashless').classList.toggle('active', m==='cashless');
-            document.getElementById('cashFields').style.display = m==='cash' ? 'block':'none'; document.getElementById('checkoutNumpadGrid').style.display = m==='cash' ? 'grid':'none'; document.getElementById('cashlessConfirmBtn').style.display = m==='cash' ? 'none':'block'; 
+        window.togglePayMethod = () => {
+            setPayMethod(currentPayMethod === 'cash' ? 'cashless' : 'cash');
         };
+
+        window.setPayMethod = (m) => { 
+            currentPayMethod = m; 
+            
+            const toggleBtn = document.getElementById('btnPayToggle');
+            const confirmBtn = document.getElementById('btnConfirmCheckout');
+            const cashFields = document.getElementById('cashFields');
+            const cashlessFields = document.getElementById('cashlessFields');
+            const tkNumBtns = document.querySelectorAll('.tk-num-btn');
+
+            if (m === 'cashless') {
+                if(toggleBtn) {
+                    toggleBtn.innerHTML = '💴<br>現金<br>にする';
+                    toggleBtn.style.background = '#fffbeb'; 
+                    toggleBtn.style.color = '#d97706'; 
+                    toggleBtn.style.borderColor = '#fcd34d';
+                }
+                if(confirmBtn) {
+                    confirmBtn.innerHTML = '📱<br>PayPay<br>で確定';
+                    confirmBtn.style.background = '#e11d48'; 
+                }
+                if(cashFields) cashFields.style.display = 'none';
+                if(cashlessFields) cashlessFields.style.display = 'flex';
+
+                tkNumBtns.forEach(btn => {
+                    btn.disabled = true;
+                });
+            } else {
+                if(toggleBtn) {
+                    toggleBtn.innerHTML = '📱<br>PayPay<br>にする';
+                    toggleBtn.style.background = '#eef6ff'; 
+                    toggleBtn.style.color = 'var(--primary)'; 
+                    toggleBtn.style.borderColor = '#bfdbfe';
+                }
+                if(confirmBtn) {
+                    confirmBtn.innerHTML = '💴<br>現金で<br>確定';
+                    confirmBtn.style.background = 'var(--success)';
+                }
+                if(cashFields) cashFields.style.display = 'flex';
+                if(cashlessFields) cashlessFields.style.display = 'none';
+
+                tkNumBtns.forEach(btn => {
+                    btn.disabled = false;
+                });
+            }
+            updateCheckoutPanel();
+        };
+
         window.setCashExact = () => {
-            if (cart.length === 0) return;
+            if (cart.length === 0 || currentPayMethod !== 'cash') return;
             const total = getCartTotal();
             cashInputString = String(total);
             cashReceived = total;
@@ -1472,14 +1700,37 @@
                 if (changeLabel) { changeLabel.innerText = "不足額"; changeLabel.style.color = "var(--accent)"; }
                 if (changeEl) { changeEl.innerText = `-¥${safeFormat(Math.abs(diff))}`; changeEl.style.color = "var(--accent)"; }
             }
-            const disabled = cart.length === 0; document.querySelectorAll('#checkoutNumpadGrid .tk-btn').forEach(btn => { btn.disabled = disabled; }); document.getElementById('cashlessConfirmBtn').disabled = disabled;
+            
+            const disabled = cart.length === 0;
+            const confirmBtn = document.getElementById('btnConfirmCheckout');
+            if (confirmBtn) {
+                confirmBtn.disabled = disabled;
+                confirmBtn.style.opacity = disabled ? '0.4' : '1';
+            }
+            
+            if (currentPayMethod === 'cash') {
+                document.querySelectorAll('.tk-num-btn').forEach(btn => { 
+                    btn.disabled = disabled; 
+                });
+            }
         }
+        
         window.numInput = (val) => { 
-            if(cart.length === 0) return; 
-            if(val === 'C') cashInputString = "0"; else { if(cashInputString === "0") cashInputString = val; else cashInputString += val; if(cashInputString.length > 8) cashInputString = cashInputString.slice(0,8); }
+            if(cart.length === 0 || currentPayMethod !== 'cash') return; 
+            if(val === 'C') cashInputString = "0"; 
+            else { 
+                if(cashInputString === "0") cashInputString = val; 
+                else cashInputString += val; 
+                if(cashInputString.length > 8) cashInputString = cashInputString.slice(0,8); 
+            }
             cashReceived = safeNumber(cashInputString); updateCheckoutPanel(); 
         };
-        window.quickAmount = (add) => { if(cart.length === 0) return; cashReceived = safeNumber(cashInputString) + add; cashInputString = String(cashReceived); updateCheckoutPanel(); };
+        window.quickAmount = (add) => { 
+            if(cart.length === 0 || currentPayMethod !== 'cash') return; 
+            cashReceived = safeNumber(cashInputString) + add; 
+            cashInputString = String(cashReceived); 
+            updateCheckoutPanel(); 
+        };
 
         window.confirmCheckout = () => {
             if(cart.length === 0) return; const total = getCartTotal();
@@ -1497,7 +1748,6 @@
 
             if(currentPayMethod === 'cash') { 
                 if (cashReceived === 0) {
-                    // お預かり未入力(0円)で確定の場合、同額ぴったりとみなして自動入力
                     cashReceived = total;
                     cashInputString = String(total);
                     updateCheckoutPanel();
@@ -1586,15 +1836,13 @@
                         const p = state.products.find(x=>x.id===c.id); 
                         let price = p.price + (c.toppingPrice || 0); 
                         subTotal += price * c.qty; 
-                        let itemName = p ? p.name : "不明商品";
-                        if (c.toppingName) itemName += ` (+${c.toppingName})`;
-                        return { id: c.id, name: itemName, qty: c.qty, cost: (p ? p.cost : 0), topping: c.toppingName || null, price: price }; 
+                        return { id: c.id, qty: c.qty, cost: (p ? p.cost : 0), toppingName: c.toppingName || null, toppingPrice: c.toppingPrice || 0, price: price }; 
                     });
                     
                     const newLog = { ticket: nextTicketNum, deviceId: myDeviceId, role: effRole, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), timestamp: Date.now() + idx, method: currentPayMethod, total: subTotal, provided: false, items: cItems };
                     
                     localSalesLog.push(newLog); mergedSalesLog.push(newLog); pushSingleLog(newLog);
-                    receiptHtmls.push(`<div class="receipt-view" style="margin-bottom:15px;"><div style="font-size:20px; font-weight:900;">整理券番号${splitCarts ? ` <span style="font-size:14px; color:var(--text-side);">(${idx+1}枚目)</span>` : ''}</div><div style="font-size:60px; font-weight:900; color:var(--primary);">No.${nextTicketNum}</div><div style="border-top:2px dashed #000; margin-top:10px; padding-top:10px; text-align:left;">${newLog.items.map(i=>`<div style="display:flex;justify-content:space-between;font-weight:800;margin-bottom:4px;"><span>${escapeHtml(parseItemName(i.name).baseName)} x${i.qty}</span><span>¥${safeFormat(i.price*i.qty)}</span></div>`).join('')}</div></div>`);
+                    receiptHtmls.push(`<div class="receipt-view" style="margin-bottom:15px;"><div style="font-size:20px; font-weight:900;">整理券番号${splitCarts ? ` <span style="font-size:14px; color:var(--text-side);">(${idx+1}枚目)</span>` : ''}</div><div style="font-size:60px; font-weight:900; color:var(--primary);">No.${nextTicketNum}</div><div style="border-top:2px dashed #000; margin-top:10px; padding-top:10px; text-align:left;">${newLog.items.map(i=>`<div style="display:flex;justify-content:space-between;font-weight:800;margin-bottom:4px;"><span>${escapeHtml(getItemBaseName(i))} x${i.qty}</span><span>¥${safeFormat(i.price*i.qty)}</span></div>`).join('')}</div></div>`);
                 });
                 saveDataLocalOnly(); document.getElementById('receiptContent').innerHTML = `<div style="max-height:60vh; overflow-y:auto; padding-right:10px;">${receiptHtmls.join('')}</div>`;
                 cart = []; splitCarts = null; cashInputString = "0"; cashReceived = 0; setPayMethod('cash'); 
@@ -1613,8 +1861,8 @@
             if (activeOrders.length === 0) { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:60px; font-size:22px; font-weight:900; color:var(--text-side);">待機中の注文が見つかりません。</div>'; return; }
             grid.innerHTML = activeOrders.map(order => {
                 const itemsHtml = order.items.map(i => {
-                    const baseName = parseItemName(i.name).baseName;
-                    const topping = parseItemName(i.name).topping; 
+                    const baseName = getItemBaseName(i);
+                    const topping = getItemTopping(i); 
                     const toppingHtml = topping ? `<div style="font-size:14px; color:#f59e0b; margin-top:4px; padding-left:12px; border-left:3px solid #f59e0b;">➕ ${escapeHtml(topping)}</div>` : '';
                     return `<div style="margin-bottom:12px; border-bottom:1px dashed #e2e8f0; padding-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:20px; font-weight:900;"><span>${escapeHtml(baseName)}</span><span style="color:var(--primary); font-size:22px;">x${i.qty}</span></div>${toppingHtml}</div>`;
                 }).join('');
@@ -1625,8 +1873,8 @@
         window.openHandoverConfirmModal = (ticket, timestamp) => {
             const order = mergedSalesLog.find(l => l.ticket === ticket && l.timestamp === timestamp); if(!order) return;
             const itemsHtml = order.items.map(i => {
-                const baseName = parseItemName(i.name).baseName;
-                const topping = parseItemName(i.name).topping; 
+                const baseName = getItemBaseName(i);
+                const topping = getItemTopping(i); 
                 const toppingHtml = topping ? `<div style="font-size:20px; color:#d97706; margin-top:8px; padding: 8px 12px; background: #fffbeb; border-radius: 8px; border: 1px solid #fde68a; display: inline-block;">➕ ${escapeHtml(topping)}</div>` : '';
                 return `<div style="margin-bottom:20px; border-bottom:2px dashed #cbd5e1; padding-bottom:20px;"><div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-size: 32px; font-weight: 900; line-height: 1.2;">${escapeHtml(baseName)}</span><span style="color:var(--primary); font-size: 44px; font-weight: 900; line-height: 1;">x${i.qty}</span></div>${toppingHtml}</div>`;
             }).join('');
@@ -1646,19 +1894,23 @@
             openNumPad(type, pid, `${p.name} ${type==='adminPrice'?'売価':'原価'}`, type==='adminPrice'?p.price:p.cost);
         };
 
-        window.purgeInactiveProducts = () => {
+        // ▼ 修正: 商品一括削除時、クラウドへnullをパッチして物理削除
+        window.purgeInactiveProducts = async () => {
             const usedIds = new Set();
             mergedSalesLog.forEach(l => (l.items||[]).forEach(i => usedIds.add(i.id)));
-            if (state.dailySummary && state.dailySummary.productStats) {
-                Object.keys(state.dailySummary.productStats).forEach(id => { if(!isNaN(id)) usedIds.add(Number(id)); else usedIds.add(id); });
-            }
             
             const initialCount = state.products.length;
+            const toDeleteIds = state.products.filter(p => !p.active && !usedIds.has(p.id)).map(p => p.id);
             state.products = state.products.filter(p => p.active || usedIds.has(p.id));
             const removedCount = initialCount - state.products.length;
             
             if (removedCount > 0) {
                 saveDataLocalOnly();
+                if (syncConfig.enabled && syncConfig.dbUrl && syncConfig.syncId) {
+                    const payload = { updatedAt: Date.now() };
+                    toDeleteIds.forEach(id => { payload[`state/products/${id}`] = null; });
+                    await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify(payload) });
+                }
                 pushLocalState(true);
                 renderAdmin();
                 showToast(`${removedCount}件の無効商品を削除しました`, "success");
@@ -1667,23 +1919,19 @@
             }
         };
 
-        // 全注文履歴モーダル用リスト描画（独立関数として分離）
         function renderFullTicketList() {
             document.getElementById('fullTicketList').innerHTML = `<table style="width:100%; border-collapse: collapse;"><thead><tr><th>No.</th><th>時間</th><th>金額</th><th>操作</th></tr></thead><tbody>${[...localSalesLog].reverse().map(l=>`<tr><td style="font-weight:900;">${l.ticket}</td><td>${l.time}</td><td style="font-weight:900; color:var(--primary);">¥${safeFormat(l.total)}</td><td><button class="sys-btn" style="padding:6px 12px; font-size:12px;" onclick="deleteAdminLog(${l.ticket}, ${l.timestamp})">取消</button></td></tr>`).join('')}</tbody></table>`;
         }
 
         function renderAdmin() {
-            if(!state.dailySummary) state.dailySummary = { sales: 0, cost: 0, count: 0, cashSales: 0, cashlessSales: 0, cashCount: 0, cashlessCount: 0, productStats: {} };
-            
-            let grandTotal = state.dailySummary.sales || 0; 
+            let grandTotal = 0; 
             let profitTotal = 0; 
-            let costTotal = state.dailySummary.cost || 0; 
-            let cashSales = state.dailySummary.cashSales || 0; 
-            let cashCount = state.dailySummary.cashCount || 0; 
-            let cashlessSales = state.dailySummary.cashlessSales || 0; 
-            let cashlessCount = state.dailySummary.cashlessCount || 0; 
-            
-            let pStats = JSON.parse(JSON.stringify(state.dailySummary.productStats || {}));
+            let costTotal = 0; 
+            let cashSales = 0; 
+            let cashCount = 0; 
+            let cashlessSales = 0; 
+            let cashlessCount = 0; 
+            let pStats = {};
 
             mergedSalesLog.forEach(l => { 
                 grandTotal += l.total; 
@@ -1694,22 +1942,22 @@
                     const cost = unitCost * i.qty; 
                     costTotal += cost; 
                     
-                    // i.priceは旧バージョンのログには存在しない場合があるため、商品マスタからフォールバック
-                    const price = (i.price !== undefined) ? i.price : (p ? p.price : 0);
-                    const k = i.id || parseItemName(i.name).baseName; 
-                    if(!pStats[k]) pStats[k] = { name: parseItemName(i.name).baseName, qty:0, sales:0, profit:0 }; 
-                    pStats[k].name = parseItemName(i.name).baseName; 
+                    const price = getItemPrice(i);
+                    const k = i.id || getItemBaseName(i); 
+                    if(!pStats[k]) pStats[k] = { name: getItemBaseName(i), qty:0, sales:0, profit:0 }; 
+                    pStats[k].name = getItemBaseName(i); 
                     pStats[k].qty += i.qty; 
                     pStats[k].sales += (price*i.qty); 
                     pStats[k].profit += (price*i.qty - cost); 
                 }); 
             });
             profitTotal = grandTotal - costTotal;
+            lastCashSalesTotal = cashSales;
 
             document.getElementById('adminTotalSales').innerText = safeFormat(grandTotal); 
             document.getElementById('adminTotalProfit').innerText = safeFormat(profitTotal); 
             document.getElementById('adminTotalCost').innerText = safeFormat(costTotal); 
-            document.getElementById('adminTotalCustomers').innerText = mergedSalesLog.length + (state.dailySummary.count || 0);
+            document.getElementById('adminTotalCustomers').innerText = mergedSalesLog.length;
             
             document.querySelector('#analyticsProductTable tbody').innerHTML = Object.values(pStats).sort((a,b)=>b.sales-a.sales).map(p => `<tr><td style="font-weight:800;">${escapeHtml(p.name)}</td><td style="text-align:right;">${p.qty}</td><td style="text-align:right; font-weight:900; color:var(--primary);">¥${safeFormat(p.sales)}</td><td style="text-align:right; font-weight:900; color:var(--success);">¥${safeFormat(p.profit)}</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;">データなし</td></tr>';
             
@@ -1732,7 +1980,61 @@
                 return `<div class="product-master-card" id="pmc_${p.id}"><div class="pmc-header"><div style="font-weight:900; font-size:18px;">ID: ${p.id}</div><button class="sys-btn" style="color:var(--accent); background:rgba(255,59,48,0.1); padding:8px 16px; font-size:14px;" onclick="deleteAdminProduct(${p.id})">🗑 削除</button></div><div class="pmc-field" style="margin-bottom:16px;"><div class="pmc-label">商品名</div><input type="text" id="p_name_${p.id}" class="pmc-input" value="${escapeHtml(p.name)}" placeholder="商品名を入力"></div><div class="pmc-grid"><div class="pmc-field"><div class="pmc-label">売価 (円)</div><div class="pmc-fake-input" id="price_display_${p.id}" data-val="${p.price}" onclick="handleAdminNumPad('adminPrice', ${p.id})">¥${safeFormat(p.price)}</div></div><div class="pmc-field"><div class="pmc-label">原価 (円)</div><div class="pmc-fake-input" id="cost_display_${p.id}" data-val="${p.cost}" onclick="handleAdminNumPad('adminCost', ${p.id})">¥${safeFormat(p.cost)}</div></div><div class="pmc-field"><div class="pmc-label">全体在庫 (自動配分)</div><div class="pmc-fake-input" style="color:var(--primary); display:flex; justify-content:space-between; align-items:center;" onclick="openInvModal(${p.id})"><span style="font-weight:900;">残 ${remainingStock} 個</span><span style="font-size:12px; background:#eef6ff; padding:4px 8px; border-radius:6px; color:#007aff;">変更</span></div></div></div><div class="ios-toggle-row"><div style="font-weight:800;">レジ画面に表示 (販売中)</div><input type="checkbox" class="ios-toggle" id="p_active_${p.id}" ${p.active ? 'checked':''}></div>${toppingPreviewHtml}</div>`
             }).join('') || '<p style="padding:20px; font-weight:800; color:var(--text-side);">商品がありません。</p>';
 
-            renderFullTicketList(); // 独立関数に分離済み
+            renderFullTicketList();
+            if (document.getElementById('adminSection_cash') && document.getElementById('adminSection_cash').style.display !== 'none') renderCashCheck();
+        }
+
+        // --- 現金過不足チェック（記録は行わない一時的な確認ツール） ---
+        function buildCashCheckDenomList() {
+            const wrap = document.getElementById('cashCheckDenomList');
+            if (!wrap) return;
+            wrap.innerHTML = cashCheckDenoms.map(d => {
+                const label = d >= 1000 ? `¥${safeFormat(d)}札` : `¥${safeFormat(d)}硬貨`;
+                return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--border);">
+                    <div style="font-weight:800; width:110px;">${label}</div>
+                    <div class="pmc-fake-input" id="cashCheckDenom_${d}" data-val="0" style="width:90px;" onclick="openNumPad('cashDenom', ${d}, '${label} の枚数', document.getElementById('cashCheckDenom_${d}').getAttribute('data-val') || 0, false, false)">0</div>
+                    <div style="width:110px; text-align:right; font-weight:900; color:var(--primary);" id="cashCheckDenomSub_${d}">¥0</div>
+                </div>`;
+            }).join('');
+        }
+
+        window.updateCashCheckCount = (denom, val) => {
+            cashCheckCounts[denom] = Math.max(0, Math.floor(safeNumber(val, 0)));
+            const disp = document.getElementById('cashCheckDenom_'+denom);
+            if (disp) { disp.innerText = cashCheckCounts[denom]; disp.setAttribute('data-val', cashCheckCounts[denom]); }
+            const sub = document.getElementById('cashCheckDenomSub_'+denom);
+            if (sub) sub.innerText = '¥' + safeFormat(cashCheckCounts[denom] * denom);
+            renderCashCheck();
+        };
+
+        window.resetCashCheckCount = () => {
+            cashCheckDenoms.forEach(d => {
+                cashCheckCounts[d] = 0;
+                const disp = document.getElementById('cashCheckDenom_'+d); if (disp) { disp.innerText = 0; disp.setAttribute('data-val', 0); }
+                const sub = document.getElementById('cashCheckDenomSub_'+d); if (sub) sub.innerText = '¥0';
+            });
+            const floatDisp = document.getElementById('cashCheckFloatDisplay');
+            if (floatDisp) { floatDisp.innerText = '¥0'; floatDisp.setAttribute('data-val', 0); }
+            renderCashCheck();
+        };
+
+        function renderCashCheck() {
+            if (!document.getElementById('cashCheckDenomList')) return;
+            if (!document.getElementById('cashCheckDenomList').innerHTML) buildCashCheckDenomList();
+
+            const actualTotal = cashCheckDenoms.reduce((sum, d) => sum + (safeNumber(cashCheckCounts[d], 0) * d), 0);
+            const floatDisp = document.getElementById('cashCheckFloatDisplay');
+            const floatVal = safeNumber(floatDisp ? floatDisp.getAttribute('data-val') : 0, 0);
+            const expected = floatVal + lastCashSalesTotal;
+            const diff = actualTotal - expected;
+
+            document.getElementById('cashCheckExpectedSales').innerText = safeFormat(lastCashSalesTotal);
+            document.getElementById('cashCheckActualTotal').innerText = safeFormat(actualTotal);
+            const diffEl = document.getElementById('cashCheckDiffValue');
+            const diffColor = diff === 0 ? 'var(--success)' : (diff > 0 ? '#007aff' : 'var(--accent)');
+            const diffLabel = diff === 0 ? '(一致)' : (diff > 0 ? '(現金過剰)' : '(現金不足)');
+            diffEl.style.color = diffColor;
+            diffEl.innerHTML = `${diff >= 0 ? '+' : ''}¥${safeFormat(diff)} <span style="font-size:12px;">${diffLabel}</span>`;
         }
 
         window.openInvModal = (id) => {
@@ -1749,7 +2051,10 @@
             if (type === 'reduce' && remaining < amt) { showToast("現在の残り在庫数より多く削減することはできません", "error"); return; }
             const delta = type === 'add' ? amt : -amt; const actionStr = type === 'add' ? `${amt}個 追加` : `${amt}個 削減`;
             if (!confirm(`【在庫変更の確認】\n「${p.name}」の全体在庫を ${actionStr} しますか？\n（現在: ${remaining}個 → 変更後: ${remaining + delta}個）`)) return;
-            let addMain = splitCount > 1 ? Math.ceil(delta / 2) : delta; let addSub = splitCount > 1 ? Math.floor(delta / 2) : 0;
+            
+            let addMain = splitCount > 1 ? (type === 'add' ? Math.ceil(delta / 2) : Math.floor(delta / 2)) : delta; 
+            let addSub = splitCount > 1 ? (type === 'add' ? Math.floor(delta / 2) : Math.ceil(delta / 2)) : 0;
+            
             p.mainAssigned = safeNumber(p.mainAssigned) + addMain; p.subAssigned = safeNumber(p.subAssigned) + addSub; p.stockUpdatedAt = Date.now();
             saveDataLocalOnly(); pushLocalState(true); refreshAllUI(); closeModal('inventoryModal'); showToast(`在庫を ${actionStr} しました`, "success");
         };
@@ -1767,7 +2072,25 @@
             saveDataLocalOnly(); pushLocalState(true); refreshAllUI(); showToast("商品情報を保存して同期しました", "success");
         });
         
-        window.deleteAdminProduct = (id) => { if(confirm("削除しますか？")) { state.products = state.products.filter(p=>p.id!==id); saveDataLocalOnly(); pushLocalState(true); renderAdmin(); } };
+        // ▼ 修正: 個別削除時、クラウドへDELETEリクエストを発行して物理削除
+        window.deleteAdminProduct = async (id) => { 
+            const isUsed = mergedSalesLog.some(l => l.items.some(i => i.id === id));
+            if (isUsed) {
+                showToast("すでに注文履歴が存在する商品は削除できません。「レジ画面に表示」をOFFにしてください。", "error");
+                return;
+            }
+            if(confirm("この商品を削除しますか？")) { 
+                state.products = state.products.filter(p=>p.id!==id); 
+                saveDataLocalOnly(); 
+                
+                if (syncConfig.enabled && syncConfig.dbUrl && syncConfig.syncId) {
+                    await safeFetch(`${syncUrlBase()}/state/products/${id}.json`, { method: 'DELETE' });
+                }
+                
+                pushLocalState(true); 
+                renderAdmin(); 
+            } 
+        };
         
         window.deleteAdminLog = async (t, ts) => { 
             if(!confirm(`No.${t} を取消しますか？`)) return; const idx = localSalesLog.findIndex(l=>l.ticket===t && l.timestamp===ts); 
@@ -1777,16 +2100,14 @@
                 
                 if (syncConfig.enabled && syncConfig.dbUrl && syncConfig.syncId && isSyncReady) {
                     try {
-                        const res = await fetch(`${syncUrlBase()}/logs/${targetDeviceId}/${ts}.json`, { method: 'DELETE' });
-                        if (res.ok) { await fetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify({ updatedAt: Date.now() }) }); } 
-                        else { showToast("クラウド削除を次回同期時に再試行します", "error"); localStorage.setItem('syncPending_V42', 'true'); }
+                        const res = await safeFetch(`${syncUrlBase()}/logs/${targetDeviceId}/${ts}.json`, { method: 'DELETE' });
+                        if (res.ok) { await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify({ updatedAt: Date.now() }) }); } 
+                        else { pendingDeletions.push({ deviceId: targetDeviceId, timestamp: ts, ticket: t }); safeSetLocal('posPendingDeletions_V42', JSON.stringify(pendingDeletions)); showToast("クラウド削除を次回同期時に再試行します", "error"); }
                     } catch(e) {
-                        showToast("クラウド削除を次回同期時に再試行します", "error"); localStorage.setItem('syncPending_V42', 'true');
+                        pendingDeletions.push({ deviceId: targetDeviceId, timestamp: ts, ticket: t }); safeSetLocal('posPendingDeletions_V42', JSON.stringify(pendingDeletions)); showToast("クラウド削除を次回同期時に再試行します", "error");
                     }
-                } else if (syncConfig.enabled) {
-                    // 同期が有効だが一時的に未接続の場合のみ再試行フラグを設定
-                    // ※同期無効(オフライン運用)時にフラグをセットすると離脱警告が永続化するため除外
-                    localStorage.setItem('syncPending_V42', 'true'); pushLocalState();
+                } else {
+                    pendingDeletions.push({ deviceId: targetDeviceId, timestamp: ts, ticket: t }); safeSetLocal('posPendingDeletions_V42', JSON.stringify(pendingDeletions)); pushLocalState();
                 }
                 refreshAllUI(); showToast("取消完了", "success"); 
             } 
@@ -1834,7 +2155,7 @@
             
             filteredLogsForView = baseLogs.filter(l => {
                 if(search) { 
-                    const ticketStr = String(l.ticket); const itemsStr = l.items.map(i=>parseItemName(i.name).baseName).join(' ').toLowerCase(); const devId = String(l.deviceId || '').toLowerCase(); 
+                    const ticketStr = String(l.ticket); const itemsStr = l.items.map(i=>getItemBaseName(i)).join(' ').toLowerCase(); const devId = String(l.deviceId || '').toLowerCase(); 
                     let devName = ''; if(state.activeDevices && state.activeDevices[l.deviceId]) { devName = String(state.activeDevices[l.deviceId].deviceName || '').toLowerCase(); }
                     if(!ticketStr.includes(search) && !itemsStr.includes(search) && !devId.includes(search) && !devName.includes(search)) return false; 
                 }
@@ -1855,8 +2176,8 @@
                     const l = viewLogs[idx]; const isProvided = l.provided || (state.providedTickets && state.providedTickets[`${l.ticket}_${l.timestamp}`]);
                     let cost = 0; 
                     const itemsStr = l.items.map(i => { 
-                        const baseName = parseItemName(i.name).baseName;
-                        const topping = parseItemName(i.name).topping;
+                        const baseName = getItemBaseName(i);
+                        const topping = getItemTopping(i);
                         const p = state.products.find(x => x.name === baseName || x.id === i.id); 
                         const unitCost = i.cost !== undefined ? i.cost : (p ? p.cost : 0); cost += unitCost * i.qty; 
                         const tHtml = topping ? `<br><span style="color:#d97706; font-size:11px;">+${escapeHtml(topping)}</span>` : '';
@@ -1871,7 +2192,7 @@
 
                     html += `<tr style="border-bottom:1px solid #e2e8f0;"><td style="font-size:13px; font-weight:800; color:var(--text-side);">${dateFmt}</td><td style="font-weight:900; text-align:center; font-size:16px;">${l.ticket}</td><td>${methodHtml}<br><div style="margin-top:6px;">${provHtml}</div></td><td style="font-size:13px; font-weight:800; line-height:1.4;">${itemsStr}</td><td style="font-weight:900; color:var(--primary); text-align:right; font-size:15px;">¥${safeFormat(l.total)}</td><td style="font-weight:800; color:var(--text-side); text-align:right; font-size:14px;">¥${safeFormat(cost)}</td><td style="font-weight:900; color:var(--success); text-align:right; font-size:15px;">¥${safeFormat(profit)}</td><td style="font-weight:800; color:var(--text-side); text-align:center; font-size:12px;">${escapeHtml(devNameStr)}</td><td style="text-align:center;">${l.deviceId===myDeviceId ? `<button class="action-btn cancel-btn" style="padding:6px 12px; font-size:12px; margin:0; width:auto; border-radius:8px;" onclick="deleteAdminLog(${l.ticket},${l.timestamp})">取消</button>` : '<span style="font-size:11px; font-weight:800; color:var(--text-side); background:var(--bg-main); padding:4px 8px; border-radius:6px;">他端末</span>'}</td></tr>`;
                 }
-                viewLogs.forEach(l => { let c = 0; l.items.forEach(i => { const baseName = parseItemName(i.name).baseName; const p = state.products.find(x => x.name === baseName || x.id === i.id); c += i.cost !== undefined ? i.cost * i.qty : (p ? p.cost : 0) * i.qty; }); sumSales += l.total; sumCost += c; sumProfit += (l.total - c); });
+                viewLogs.forEach(l => { let c = 0; l.items.forEach(i => { const baseName = getItemBaseName(i); const p = state.products.find(x => x.name === baseName || x.id === i.id); c += i.cost !== undefined ? i.cost * i.qty : (p ? p.cost : 0) * i.qty; }); sumSales += l.total; sumCost += c; sumProfit += (l.total - c); });
                 if (viewLogs.length > 1000) html += `<tr><td colspan="9" style="text-align:center; padding:15px; font-weight:800; color:var(--text-side);">※表示上限(1000件)を超過しています。絞り込みをご利用ください。集計は全${viewLogs.length}件を計算済です。</td></tr>`;
                 tbody.innerHTML = html;
             }
@@ -1882,7 +2203,7 @@
             if(filteredLogsForView.length === 0) { showToast("コピーするデータがありません", "error"); return; }
             let tsv = "日時\t取引ID\t整理券番号\t営業日\t決済方法\t売上金額\t原価合計\t想定利益\t購入商品詳細\t提供状態\t担当端末\n";
             filteredLogsForView.forEach(l => {
-                const isProvided = l.provided || (state.providedTickets && state.providedTickets[`${l.ticket}_${l.timestamp}`]); let cost = 0; const itemsStr = l.items.map(i => { const baseName = parseItemName(i.name).baseName; const p = state.products.find(x => x.name === baseName || x.id === i.id); const unitCost = i.cost !== undefined ? i.cost : (p ? p.cost : 0); cost += unitCost * i.qty; return `${baseName} x${i.qty}`; }).join(' / ');
+                const isProvided = l.provided || (state.providedTickets && state.providedTickets[`${l.ticket}_${l.timestamp}`]); let cost = 0; const itemsStr = l.items.map(i => { const baseName = getItemBaseName(i); const p = state.products.find(x => x.name === baseName || x.id === i.id); const unitCost = i.cost !== undefined ? i.cost : (p ? p.cost : 0); cost += unitCost * i.qty; return `${baseName} x${i.qty}`; }).join(' / ');
                 const profit = l.total - cost; const methodStr = l.method === 'cashless' ? 'PayPay' : '現金'; const provStr = isProvided ? '提供済' : '調理中'; const dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString('ja-JP') : l.time; const dayStr = l.timestamp ? new Date(l.timestamp).toLocaleDateString('ja-JP') : ''; const txId = `${l.deviceId}_${l.timestamp}_${l.ticket}`; 
                 
                 let devNameStr = '不明';
