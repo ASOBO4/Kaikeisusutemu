@@ -77,6 +77,12 @@
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(3px); z-index: 1000; justify-content: center; align-items: center; }
         .modal-overlay-top { z-index: 9999 !important; }
         .modal-overlay.active { display: flex; }
+        /* 初期設定（パスワード・開始現金）：入力カードは左、システムのテンキーは右端に固定表示 */
+        @media (min-width: 900px) {
+            #mandatoryPasswordModal, #startingCashModal { box-sizing: border-box; padding-right: 440px; }
+            #universalNumPad.unp-dock-right { background: transparent; backdrop-filter: none; justify-content: flex-end; padding-right: 30px; pointer-events: none; }
+            #universalNumPad.unp-dock-right .modal-content { pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
+        }
         .modal-content { background: var(--bg-side); padding: 30px; border-radius: 24px; box-shadow: var(--shadow-lg); max-height: 95vh; overflow-y: auto; width: 90vw; max-width: 520px; }
         
         .swipe-history-handle { background: var(--glass-bg); padding: 8px 16px 6px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: background 0.15s ease; flex-shrink: 0; }
@@ -278,6 +284,9 @@
             <div class="top-bar">
                 <h1>🍳 受け渡し管理 <span style="font-size:12px; font-weight:800; color:var(--text-side); background:var(--bg-main); border:1px solid var(--border); padding:4px 12px; border-radius:99px; margin-left:10px;">同期中</span></h1>
                 <div class="btn-group-top">
+                    <button class="sys-btn" id="hoUndoBtn" onclick="openProvidedListModal()">↩ 提供済みを戻す</button>
+                    <button class="sys-btn" id="hoSortBtn_number" onclick="setHandoverSortMode('number')">🔢 番号順</button>
+                    <button class="sys-btn" id="hoSortBtn_time" onclick="setHandoverSortMode('time')">🕘 時間順</button>
                     <button class="sys-btn" onclick="toggleFullScreen()">⛶ 全画面</button>
                     <button class="sys-btn blue" onclick="toggleSystemMode()">🛒 レジ画面へ戻る</button>
                 </div>
@@ -296,6 +305,7 @@
                         <button class="tk-btn" style="height:70px; font-size:28px;" onclick="hoNumInput('1')">1</button><button class="tk-btn" style="height:70px; font-size:28px;" onclick="hoNumInput('2')">2</button><button class="tk-btn" style="height:70px; font-size:28px;" onclick="hoNumInput('3')">3</button>
                         <button class="tk-btn" style="height:70px; font-size:28px; color:var(--accent);" onclick="hoSearchClear()">C</button><button class="tk-btn" style="height:70px; font-size:28px;" onclick="hoNumInput('0')">0</button><button class="tk-btn" style="height:70px; font-size:20px; background:#e2e8f0; color:#1c1c1e;" onclick="hoSearchClear()">全消</button>
                     </div>
+                    <button class="sys-btn blue" id="btnHandoverRefresh" onclick="manualHandoverRefresh()" style="width:100%; margin-top:14px; padding:16px; font-size:18px;">🔄 最新の注文を取得</button>
                 </div>
             </div>
         </div>
@@ -363,8 +373,9 @@
                                     期待現金額 = 釣銭準備金 + システム上の現金売上<br>
                                     過不足 = 実際に数えた現金 − 期待現金額<br>
                                     <span style="color:var(--accent);">※プラスは現金が多い（釣銭の渡し間違い等）、マイナスは少ない状態です。</span><br>
-                                    <span style="color:var(--text-side);">※この画面の入力内容は記録・保存されません。確認用の一時計算ツールです。</span>
+                                    <span style="color:var(--text-side);">※金種の枚数は記録・保存されません。釣銭準備金のみ、この端末にローカル保存されています。</span>
                                 </div>
+                                <button class="action-btn cancel-btn" style="margin-top:16px; margin-bottom:0;" onclick="closeRegisterForDay()">🔒 本日のレジを締める（開始現金をリセット）</button>
                             </div>
                         </div>
                     </div>
@@ -468,7 +479,14 @@
                                     <div class="settings-icon" style="background:#4b5563;">🔐</div>
                                     <div><div style="font-weight:900; font-size:16px;">設定・管理パスワード</div><div style="font-size:12px; color:var(--text-side);" id="pwdStatusText">⚪ 未設定</div></div>
                                 </div>
-                                <div class="settings-item-right"><button class="sys-btn" onclick="openNumPad('setAuth', null, '新しいパスワードを入力 (空で解除)', '', true, false)">設定 / 変更</button></div>
+                                <div class="settings-item-right"><button class="sys-btn" onclick="openNumPad('setAuth', null, '新しいパスワードを入力', '', true, false)">設定 / 変更</button></div>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-item-left">
+                                    <div class="settings-icon" style="background:#f59e0b;">💴</div>
+                                    <div><div style="font-weight:900; font-size:16px;">開始現金（ローカル保存）</div><div style="font-size:12px; color:var(--text-side);" id="startingCashStatusText">⚪ 未登録</div></div>
+                                </div>
+                                <div class="settings-item-right"><span style="font-size:12px; color:var(--text-side); font-weight:800;">「現金過不足チェック」タブで確認・締め</span></div>
                             </div>
                         </div>
 
@@ -783,18 +801,53 @@
     <!-- その他モーダル -->
     <div class="modal-overlay" id="receiptModal"><div class="modal-content" style="max-width: 400px;"><div id="receiptContent" style="margin-bottom: 20px;"></div><button class="action-btn" style="margin:0; background: #111827;" onclick="closeReceipt()">確認して戻る</button></div></div>
     <div class="modal-overlay" id="ticketDetailModal"><div class="modal-content" style="max-width: 700px;"><h2 style="margin-top:0;">全注文履歴 (取消)</h2><div style="padding: 15px; max-height: 50vh; overflow:auto; border:1px solid var(--border); border-radius:14px;" id="fullTicketList"></div><button class="action-btn cancel-btn" style="margin-top:20px; margin-bottom:0;" onclick="closeModal('ticketDetailModal')">閉じる</button></div></div>
-    
+    <div class="modal-overlay" id="providedListModal"><div class="modal-content" style="max-width: 560px;"><h2 style="margin-top:0;">↩ 提供済みの番号</h2><div style="font-size:13px; font-weight:800; color:var(--text-side); margin:-6px 0 12px;">間違えて提供完了にした番号の「戻す」を押すと、待機中に戻ります（新しい順）</div><div style="max-height:55vh; overflow:auto; border:1px solid var(--border); border-radius:14px; padding:4px 14px;" id="providedListBody"></div><button class="action-btn cancel-btn" style="margin-top:20px; margin-bottom:0;" onclick="closeModal('providedListModal')">閉じる</button></div></div>
+
     <div class="modal-overlay modal-overlay-top" id="firstTimeRoleModal">
         <div class="modal-content" style="width: 520px; padding: 28px;">
             <h2 style="margin-top:0; text-align:center;">端末の役割を選択</h2>
             <p style="text-align:center; font-size:13px; color:var(--text-side); font-weight:800; margin-top:-10px; margin-bottom:20px;">この端末をどのレジとして使いますか？<br>あとから「設定・同期」タブでいつでも変更できます。</p>
-            <div style="display:flex; flex-direction:column; gap:10px;">
+            <div id="firstRoleButtons" style="display:flex; flex-direction:column; gap:10px;">
                 <button class="sys-btn blue" onclick="selectFirstRoleAndClose('main')" style="padding:20px; font-size:18px;">🟢 メインレジ (1号機)</button>
-                <button class="sys-btn" onclick="selectFirstRoleAndClose('sub')" style="padding:20px; font-size:18px;">🟠 サブレジ (2号機以降)</button>
+                <button class="sys-btn" onclick="showFirstRoleSubSync()" style="padding:20px; font-size:18px;">🟠 サブレジ (2号機以降)</button>
                 <button class="sys-btn" onclick="selectFirstRoleAndClose('viewer')" style="padding:20px; font-size:18px;">👁️ 閲覧専用</button>
+            </div>
+            <!-- サブレジ選択時：メインレジの同期IDを入力して管理パスワードを引き継ぐ -->
+            <div id="firstRoleSubSyncBar" style="display:none; flex-direction:column; gap:10px;">
+                <div style="background:rgba(255,149,0,0.08); border:1px solid rgba(255,149,0,0.3); border-radius:14px; padding:16px;">
+                    <div style="font-weight:900; font-size:15px; margin-bottom:6px;">🟠 サブレジとして接続</div>
+                    <div style="font-size:12px; color:var(--text-side); font-weight:800; line-height:1.7; margin-bottom:12px;">メインレジの「設定・同期」に表示されている<b>同期ID</b>を入力してください。<br>メインレジの管理パスワードが自動で引き継がれます。</div>
+                    <input type="text" id="firstSyncIdInput" class="settings-input-flex" placeholder="同期ID 例: A1B2C3" maxlength="6" autocomplete="off" style="width:100%; box-sizing:border-box; text-align:center; font-size:22px; letter-spacing:4px; color:var(--primary);" oninput="formatSyncId(this)" onkeydown="if(event.key==='Enter') confirmFirstRoleSubSync()">
+                    <div id="firstSyncError" style="color:var(--accent); font-weight:800; font-size:13px; text-align:center; margin-top:10px; min-height:18px;"></div>
+                </div>
+                <button class="sys-btn blue" id="btnFirstSyncConnect" onclick="confirmFirstRoleSubSync()" style="padding:18px; font-size:18px;">🔗 接続してパスワードを引き継ぐ</button>
+                <button class="sys-btn" onclick="hideFirstRoleSubSync()" style="padding:12px; font-size:14px;">← 戻る</button>
             </div>
         </div>
     </div>
+
+    <!-- 管理パスワード設定（必須・キャンセル不可） -->
+    <div class="modal-overlay modal-overlay-top" id="mandatoryPasswordModal">
+        <div class="modal-content" style="width: 440px; padding: 28px;">
+            <h2 style="margin-top:0; text-align:center;">🔒 管理用パスワードの設定（必須）</h2>
+            <p style="text-align:center; font-size:13px; color:var(--text-side); font-weight:800; margin-top:-10px; margin-bottom:20px;">このレジを使い始める前に、設定・管理画面へ入るためのパスワードを決めてください。</p>
+            <div class="fake-input" id="setupPwdDisplay1" onclick="openSetupPad('setupPwd1')" style="margin-bottom:10px; font-size:24px; color:var(--text-side); text-align:center;">新しいパスワード（タップして入力）</div>
+            <div class="fake-input" id="setupPwdDisplay2" onclick="openSetupPad('setupPwd2')" style="font-size:24px; color:var(--text-side); text-align:center;">確認のためもう一度（タップして入力）</div>
+            <div id="mandatoryPwdError" style="color:var(--accent); font-weight:800; font-size:13px; text-align:center; margin-top:10px; min-height:18px;"></div>
+            <button class="sys-btn blue" style="width:100%; padding:18px; font-size:18px; margin-top:12px;" onclick="confirmMandatoryPassword()">このパスワードで設定する</button>
+        </div>
+    </div>
+
+    <!-- 開始現金の登録（必須・キャンセル不可） -->
+    <div class="modal-overlay modal-overlay-top" id="startingCashModal">
+        <div class="modal-content" style="width: 440px; padding: 28px;">
+            <h2 style="margin-top:0; text-align:center;">💴 開始現金の登録（必須）</h2>
+            <p style="text-align:center; font-size:13px; color:var(--text-side); font-weight:800; margin-top:-10px; margin-bottom:20px;">販売を始める前に、このレジに入っている現金（釣銭準備金）を登録してください。<br>この金額は端末内にのみ保存され、会計締め時の過不足チェックに使用します。</p>
+            <div class="fake-input" id="setupCashDisplay" data-val="" onclick="openSetupPad('setupCash')" style="font-size:28px; color:var(--text-side);">金額を入力（タップ）</div>
+            <button class="sys-btn blue" style="width:100%; padding:18px; font-size:18px; margin-top:16px;" onclick="confirmStartingCash()">この金額で登録してレジを開始する</button>
+        </div>
+    </div>
+
     <div class="modal-overlay modal-overlay-top" id="universalNumPad">
         <div class="modal-content" style="width: 380px; padding: 25px;"><h2 id="unpTitle" style="text-align: center; margin-top:0; font-size: 24px; font-weight: 800;">入力</h2><div class="fake-input" id="unpDisplay" style="margin-bottom: 10px;">0</div>
             <div class="tenkey-grid" style="grid-template-columns: repeat(4, 1fr); gap: 10px;">
@@ -905,6 +958,7 @@
         let lastCashSalesTotal = 0;
         let cashCheckDenoms = [10000,5000,2000,1000,500,100,50,10,5,1];
         let cashCheckCounts = {};
+        let cashCheckFloatInitialized = false;
         let currentPayMethod = "cash", cashReceived = 0, cashInputString = "0";
         let systemMode = 'cashier';
         
@@ -922,6 +976,7 @@
         let invContext = { id: null };
         
         let handoverSearchStr = "";
+        let handoverSortMode = "number"; // "number" = 番号順, "time" = 時間順
         let isSyncing = false; 
 
         let pendingDeletions = JSON.parse(safeGetLocal('posPendingDeletions_V42') || '[]');
@@ -1101,11 +1156,9 @@
         };
         window.hideGlobalLoading = () => { document.getElementById('globalLoadingOverlay').classList.remove('active'); };
 
-        async function pushLocalState(isProductUpdate = false) {
+        async function pushLocalState(isProductUpdate = false, includeLogs = true) {
             if (!syncConfig.enabled || !syncConfig.dbUrl || !syncConfig.syncId || !isSyncReady) return;
-            const logsObj = {}; localSalesLog.forEach(l => { logsObj[l.timestamp] = l; });
             const payload = { 
-                [`logs/${myDeviceId}`]: logsObj, 
                 "updatedAt": Date.now(), 
                 [`devices/${myDeviceId}/lastActive`]: Date.now(),
                 [`devices/${myDeviceId}/firstSeen`]: myFirstSeen,
@@ -1114,6 +1167,9 @@
                 [`devices/${myDeviceId}/deviceName`]: deviceSettings.deviceName || myDeviceId
             };
             
+            // 売上履歴は「再送・初回・取消」のときだけ全件送る（商品・端末情報の更新では送らない）
+            if (includeLogs) { const logsObj = {}; localSalesLog.forEach(l => { logsObj[l.timestamp] = l; }); payload[`logs/${myDeviceId}`] = logsObj; }
+
             // ▼ 修正: 商品マスタをIDごとのパッチ更新に変更
             if (isProductUpdate) { 
                 state.products.forEach(p => { 
@@ -1121,7 +1177,7 @@
                 }); 
             }
             
-            if (state.providedTickets) { Object.keys(state.providedTickets).forEach(ticketKey => { payload[`state/providedTickets/${ticketKey}`] = true; }); }
+            if (state.providedTickets) { Object.keys(state.providedTickets).forEach(ticketKey => { payload[`state/providedTickets/${ticketKey}`] = state.providedTickets[ticketKey]; }); }
             
             const res = await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             if (res.ok) { safeRemoveLocal('syncPending_V42'); lastKnownUpdatedAt = payload.updatedAt; markAsSynced(); }
@@ -1141,7 +1197,7 @@
 
         async function pushSingleHandover(ticketKey) {
             if (!syncConfig.enabled || !syncConfig.dbUrl || !syncConfig.syncId || !isSyncReady) return;
-            const res = await safeFetch(`${syncUrlBase()}/state/providedTickets.json`, { method: 'PATCH', body: JSON.stringify({ [ticketKey]: true }) });
+            const res = await safeFetch(`${syncUrlBase()}/state/providedTickets.json`, { method: 'PATCH', body: JSON.stringify({ [ticketKey]: state.providedTickets[ticketKey] }) });
             // ▼ 修正: 2段階目のレスポンスも確認
             if (res.ok) { 
                 const res2 = await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify({ updatedAt: Date.now() }) }); 
@@ -1170,10 +1226,9 @@
             }
             
             if (remote.state && remote.state.providedTickets) {
-                const prevCount = Object.keys(state.providedTickets || {}).length;
-                state.providedTickets = { ...state.providedTickets, ...remote.state.providedTickets };
-                const newCount = Object.keys(state.providedTickets).length;
-                if (newCount !== prevCount) dataChanged = true;
+                const prevJson = JSON.stringify(state.providedTickets || {});
+                state.providedTickets = mergeProvidedTickets(state.providedTickets, remote.state.providedTickets);
+                if (JSON.stringify(state.providedTickets) !== prevJson) dataChanged = true;
             }
             
             if (remote.devices) state.activeDevices = remote.devices;
@@ -1206,6 +1261,7 @@
             if (res.ok && res.data) { applyRemoteState(res.data); isSyncReady = true; lastKnownUpdatedAt = res.data.updatedAt || Date.now(); } 
             else if (res.ok && !res.data) { isSyncReady = true; await pushLocalState(true); } 
             else { showToast("初回同期エラー。URLを確認してください", "error"); }
+            if (isSyncReady) await syncAdminPassword(res.ok ? res.data : null);
         }
 
         async function processPendingDeletions() {
@@ -1220,10 +1276,61 @@
             if (pendingDeletions.length === 0) await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify({ updatedAt: Date.now() }) });
         }
 
+        // 軽量デバイス情報チェック：レジ画面を操作中でも必ず実行する
+        // ・サブレジはメインレジのデバイス名を自動で受け継ぐ
+        // ・メインレジはサブレジの参加を検知したら稼働台数を自動で2台に切り替える
+        // サブレジ：メインレジの管理パスワードを取得して上書きする
+        let lastAdminPwdCheck = 0;
+        async function pullAdminPasswordFromMain(force = false) {
+            const now = Date.now();
+            if (!force && now - lastAdminPwdCheck < 30000) return; // 30秒に1回だけ確認
+            lastAdminPwdCheck = now;
+            const res = await safeFetch(`${syncUrlBase()}/adminPassword.json`);
+            if (res.ok && typeof res.data === 'string' && res.data && res.data !== safeGetLocal('posAdminPassword_V42')) {
+                safeSetLocal('posAdminPassword_V42', res.data);
+                updatePwdStatusUI();
+                showToast('メインレジの管理パスワードを引き継ぎました', 'info');
+            }
+        }
+        // 役割に応じて管理パスワードを同期（メイン→クラウドへ送信／サブ←クラウドから受信）
+        async function syncAdminPassword(remoteData) {
+            const role = getEffectiveRole();
+            if (role === 'main') await pushAdminPassword();
+            else if (role === 'sub') await pullAdminPasswordFromMain(true);
+        }
+
+        async function pollDeviceInfoLight() {
+            if (!syncConfig.enabled || !isSyncReady) return;
+            const res = await safeFetch(`${syncUrlBase()}/devices.json`);
+            if (!res.ok || !res.data) return;
+            const devices = res.data;
+            state.activeDevices = devices;
+
+            const myRole = getEffectiveRole();
+            if (myRole === 'sub') {
+                await pullAdminPasswordFromMain();
+                const mainDev = Object.values(devices).find(d => d.effectiveRole === 'main' || d.role === 'main');
+                if (mainDev && mainDev.deviceName && mainDev.deviceName !== deviceSettings.deviceName) {
+                    deviceSettings.deviceName = mainDev.deviceName;
+                    const nameInput = document.getElementById('settingDeviceName'); if (nameInput) nameInput.value = deviceSettings.deviceName;
+                    safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
+                    showToast("メインレジからデバイス名を同期しました", "info");
+                }
+            } else if (myRole === 'main') {
+                const hasSub = Object.entries(devices).some(([devId, d]) => devId !== myDeviceId && (d.effectiveRole === 'sub' || d.role === 'sub'));
+                if (hasSub && deviceSettings.totalRegs !== 2) {
+                    redistributeStockForRegs(2);
+                    showToast("サブレジの参加を検知したため、稼働台数を自動で【2台】に切り替えました", "info");
+                }
+            }
+        }
+
         async function pollSync() {
             if (!syncConfig.enabled || !isSyncReady) return;
             const isAdminOpen = document.getElementById('adminPane').style.display === 'flex' || document.getElementById('adminPane').style.display === 'block';
             const isCashierScreen = (systemMode === 'cashier') && !isAdminOpen;
+
+            await pollDeviceInfoLight();
             if (isCashierScreen) return; 
 
             await processPendingDeletions();
@@ -1238,13 +1345,6 @@
                 const resData = await safeFetch(`${syncUrlBase()}.json`); 
                 if (resData.ok && resData.data) {
                     const remote = resData.data;
-                    if (remote.devices && getEffectiveRole() === 'sub') {
-                        const mainDev = Object.values(remote.devices).find(d => d.effectiveRole === 'main' || d.role === 'main');
-                        if (mainDev && mainDev.deviceName && mainDev.deviceName !== deviceSettings.deviceName) {
-                            deviceSettings.deviceName = mainDev.deviceName; document.getElementById('settingDeviceName').value = deviceSettings.deviceName;
-                            safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings)); showToast("メインレジからデバイス名を同期しました", "info");
-                        }
-                    }
                     applyRemoteState(remote); lastKnownUpdatedAt = remote.updatedAt; 
                 }
             }
@@ -1356,17 +1456,159 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadDeviceSettings(); loadSyncConfig(); loadDataLocal(); checkFirstTimeRole(); updatePwdStatusUI(); checkSubLock(); initSwipeHandle();
+            loadDeviceSettings(); loadSyncConfig(); loadDataLocal(); runSetupGateCheck(); updatePwdStatusUI(); checkSubLock(); initSwipeHandle();
             if (syncConfig.enabled && syncConfig.dbUrl && syncConfig.syncId) toggleSync(true); updateCheckoutPanel(); 
         });
 
-        // --- 初回起動時の役割選択 ---
+        // --- 初回起動時の必須セットアップ（役割選択 → パスワード設定 → 開始現金登録） ---
         function checkFirstTimeRole() {
             if (!safeGetLocal('posRoleConfig_V42')) {
                 showModal('firstTimeRoleModal');
             }
         }
-        window.openFirstTimeRoleModalForce = () => showModal('firstTimeRoleModal');
+        window.openFirstTimeRoleModalForce = () => { hideFirstRoleSubSync(); showModal('firstTimeRoleModal'); };
+
+        // --- サブレジ初期設定：同期ID入力 → メインレジの管理パスワードを引き継ぐ ---
+        window.showFirstRoleSubSync = () => {
+            document.getElementById('firstRoleButtons').style.display = 'none';
+            document.getElementById('firstRoleSubSyncBar').style.display = 'flex';
+            const input = document.getElementById('firstSyncIdInput');
+            input.value = syncConfig.syncId || '';
+            document.getElementById('firstSyncError').innerText = '';
+            setTimeout(() => input.focus(), 50);
+        };
+        window.hideFirstRoleSubSync = () => {
+            document.getElementById('firstRoleSubSyncBar').style.display = 'none';
+            document.getElementById('firstRoleButtons').style.display = 'flex';
+        };
+        window.confirmFirstRoleSubSync = async () => {
+            const input = document.getElementById('firstSyncIdInput');
+            formatSyncId(input);
+            const id = input.value;
+            const errEl = document.getElementById('firstSyncError');
+            const btn = document.getElementById('btnFirstSyncConnect');
+            if (id.length !== 6) { errEl.innerText = '同期IDは6文字で入力してください'; return; }
+            errEl.innerText = ''; btn.disabled = true; btn.innerText = '接続中...';
+            try {
+                const base = (syncConfig.dbUrl || 'https://cash-register-system-c2831-default-rtdb.asia-southeast1.firebasedatabase.app').replace(/\/+$/, '') + `/posSyncV42/${encodeURIComponent(id)}`;
+                const res = await safeFetch(`${base}/adminPassword.json`);
+                if (!res.ok) { errEl.innerText = 'オンラインに接続できませんでした。通信状況を確認してください'; return; }
+                if (typeof res.data !== 'string' || !res.data) { errEl.innerText = 'このIDのメインレジが見つかりません（メインレジで同期を開始してからお試しください）'; return; }
+
+                // 同期設定を保存し、メインレジのパスワードを引き継ぐ
+                syncConfig.syncId = id;
+                const syncIdEl = document.getElementById('syncIdInput'); if (syncIdEl) syncIdEl.value = id;
+                safeSetLocal('posAdminPassword_V42', res.data);
+                saveSyncConfigState();
+                selectFirstRoleAndClose('sub');
+                updatePwdStatusUI();
+                showToast('メインレジの管理パスワードを引き継ぎました', 'success');
+                toggleSync(true);
+            } finally {
+                btn.disabled = false; btn.innerText = '🔗 接続してパスワードを引き継ぐ';
+            }
+        };
+
+        // メインレジの管理パスワードをクラウドへ共有する（サブレジが引き継ぐ元データ）
+        async function pushAdminPassword() {
+            if (!syncConfig.enabled || !syncConfig.dbUrl || !syncConfig.syncId || !isSyncReady) return;
+            if (getEffectiveRole() !== 'main') return;
+            const pwd = safeGetLocal('posAdminPassword_V42');
+            if (!pwd) return;
+            await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminPassword: pwd }) });
+        }
+
+        // 役割選択 → パスワード設定 → 開始現金登録 の順に、すべて完了するまで順番にモーダルを表示する
+        function runSetupGateCheck() {
+            if (!safeGetLocal('posRoleConfig_V42')) {
+                closeModal('mandatoryPasswordModal'); closeModal('startingCashModal');
+                showModal('firstTimeRoleModal');
+                return;
+            }
+            if (!safeGetLocal('posAdminPassword_V42')) {
+                closeModal('firstTimeRoleModal'); closeModal('startingCashModal');
+                resetSetupPwdUI();
+                showModal('mandatoryPasswordModal');
+                openSetupPad('setupPwd1');
+                return;
+            }
+            if (safeGetLocal('posStartingCashRegistered_V42') !== 'true') {
+                closeModal('firstTimeRoleModal'); closeModal('mandatoryPasswordModal');
+                setSetupDisplay('setupCashDisplay', '', '金額を入力（タップ）');
+                showModal('startingCashModal');
+                openSetupPad('setupCash');
+                return;
+            }
+            closeModal('firstTimeRoleModal'); closeModal('mandatoryPasswordModal'); closeModal('startingCashModal');
+            if (document.getElementById('universalNumPad').classList.contains('unp-dock-right')) closeModal('universalNumPad');
+        }
+
+        // --- 初期設定用：システムのテンキーを右側に表示して入力する ---
+        let setupPwdVals = { 1: '', 2: '' };
+        function setSetupDisplay(id, val, placeholder, masked) {
+            const el = document.getElementById(id); if (!el) return;
+            el.setAttribute('data-val', val);
+            el.innerText = val ? (masked ? '●'.repeat(val.length) : val) : placeholder;
+            el.style.color = val ? 'var(--primary)' : 'var(--text-side)';
+        }
+        function resetSetupPwdUI() {
+            setupPwdVals = { 1: '', 2: '' };
+            setSetupDisplay('setupPwdDisplay1', '', '新しいパスワード（タップして入力）');
+            setSetupDisplay('setupPwdDisplay2', '', '確認のためもう一度（タップして入力）');
+            const err = document.getElementById('mandatoryPwdError'); if (err) err.innerText = '';
+        }
+        window.openSetupPad = (type) => {
+            if (type === 'setupPwd1') openNumPad(type, null, '🔒 新しいパスワード', setupPwdVals[1], true, false);
+            else if (type === 'setupPwd2') openNumPad(type, null, '🔒 パスワード（確認）', setupPwdVals[2], true, false);
+            else openNumPad(type, null, '💴 開始現金（円）', document.getElementById('setupCashDisplay').getAttribute('data-val') || '', false, false);
+        };
+
+        window.confirmMandatoryPassword = () => {
+            const p1 = setupPwdVals[1];
+            const p2 = setupPwdVals[2];
+            const errEl = document.getElementById('mandatoryPwdError');
+            if (!p1) { errEl.innerText = 'パスワードを入力してください'; return; }
+            if (p1 !== p2) { errEl.innerText = '確認用パスワードが一致しません'; return; }
+            safeSetLocal('posAdminPassword_V42', p1);
+            updatePwdStatusUI();
+            showToast('パスワードを設定しました', 'success');
+            runSetupGateCheck();
+        };
+
+        window.confirmStartingCash = () => {
+            const raw = document.getElementById('setupCashDisplay').getAttribute('data-val') || '';
+            const val = safeNumber(raw, NaN);
+            if (raw === '' || isNaN(val) || val < 0) { showToast('0以上の金額を入力してください', 'error'); return; }
+            safeSetLocal('posStartingCashAmount_V42', String(Math.floor(val)));
+            safeSetLocal('posStartingCashRegistered_V42', 'true');
+            cashCheckFloatInitialized = false;
+            updateStartingCashStatusUI();
+            showToast(`開始現金 ¥${safeFormat(Math.floor(val))} を登録しました`, 'success');
+            runSetupGateCheck();
+        };
+
+        // 会計締め：開始現金の登録状態をリセットし、次回起動時に再登録を必須にする
+        window.closeRegisterForDay = () => {
+            if (!confirm('レジを締めます。次回この端末を開くとき、開始現金の再登録が必須になります。\nよろしいですか？')) return;
+            safeRemoveLocal('posStartingCashRegistered_V42');
+            safeRemoveLocal('posStartingCashAmount_V42');
+            updateStartingCashStatusUI();
+            showToast('レジを締めました。お疲れ様でした。', 'success');
+        };
+        // 稼働台数の変更と在庫の再配分をまとめて行う共通処理
+        function redistributeStockForRegs(newRegs) {
+            state.products.forEach(p => {
+                const remaining = getProductTotalRemaining(p.id); const mainSold = getProductRoleSold(p.id, 'main'); const subSold = getProductRoleSold(p.id, 'sub');
+                if (newRegs === 1) { p.mainAssigned = mainSold + remaining; p.subAssigned = subSold; }
+                else { const halfMain = Math.ceil(remaining / 2); const halfSub = Math.floor(remaining / 2); p.mainAssigned = mainSold + halfMain; p.subAssigned = subSold + halfSub; }
+                p.stockUpdatedAt = Date.now();
+            });
+            deviceSettings.totalRegs = newRegs;
+            safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
+            const regSel = document.getElementById('settingTotalRegs'); if (regSel) regSel.value = newRegs;
+            saveDataLocalOnly(); pushLocalState(true, false); refreshAllUI();
+        }
+
         window.selectFirstRoleAndClose = (role) => {
             deviceSettings.manualRole = role;
             deviceSettings.role = role;
@@ -1376,22 +1618,12 @@
             if (roleSel) roleSel.value = role;
 
             // サブレジ選択時は稼働台数を自動で2台に切り替え、在庫を半分ずつ再配分する
-            if (role === 'sub' && deviceSettings.totalRegs !== 2) {
-                state.products.forEach(p => {
-                    const remaining = getProductTotalRemaining(p.id); const mainSold = getProductRoleSold(p.id, 'main'); const subSold = getProductRoleSold(p.id, 'sub');
-                    const halfMain = Math.ceil(remaining / 2); const halfSub = Math.floor(remaining / 2);
-                    p.mainAssigned = mainSold + halfMain; p.subAssigned = subSold + halfSub;
-                    p.stockUpdatedAt = Date.now();
-                });
-                deviceSettings.totalRegs = 2;
-                safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
-                const regSel = document.getElementById('settingTotalRegs'); if (regSel) regSel.value = 2;
-                saveDataLocalOnly(); pushLocalState(true); refreshAllUI();
-            }
+            if (role === 'sub' && deviceSettings.totalRegs !== 2) redistributeStockForRegs(2);
 
             applyDeviceRoleUI();
             closeModal('firstTimeRoleModal');
             showToast(`役割を「${role === 'auto' ? '自動判定' : (role === 'sub' ? 'サブレジ' : (role === 'viewer' ? '閲覧専用' : 'メインレジ'))}」に設定しました`, "success");
+            runSetupGateCheck();
         };
 
         // 未同期データの離脱警告
@@ -1402,12 +1634,18 @@
         });
 
         window.attemptAdminEntry = () => { closeSideDrawer(); const pwd = safeGetLocal('posAdminPassword_V42'); if (pwd) openNumPad('auth', null, 'パスワードを入力 (p〜も可)', '', true, false); else showAdminPane(); };
-        window.updatePwdStatusUI = () => { const pwd = safeGetLocal('posAdminPassword_V42'); const el = document.getElementById('pwdStatusText'); if(el) el.innerText = pwd ? '🟢 設定済み' : '⚪ 未設定 (パスワードなし)'; };
+        window.updatePwdStatusUI = () => { const pwd = safeGetLocal('posAdminPassword_V42'); const el = document.getElementById('pwdStatusText'); if(el) el.innerText = (getEffectiveRole() === 'sub' && pwd && syncConfig.syncId) ? '🔗 メインレジと共通（変更はメインレジで）' : (pwd ? '🟢 設定済み' : '⚪ 未設定 (パスワードなし)'); updateStartingCashStatusUI(); };
+        window.updateStartingCashStatusUI = () => {
+            const el = document.getElementById('startingCashStatusText'); if (!el) return;
+            const registered = safeGetLocal('posStartingCashRegistered_V42') === 'true';
+            const amount = safeGetLocal('posStartingCashAmount_V42');
+            el.innerText = registered ? `🟢 登録済み（¥${safeFormat(safeNumber(amount, 0))}）` : '⚪ 未登録';
+        };
 
         window.updateManualRole = () => {
             deviceSettings.manualRole = document.getElementById('settingManualRole').value;
             safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
-            applyDeviceRoleUI(); pushLocalState(); showToast("役割設定を更新しました", "success");
+            applyDeviceRoleUI(); pushLocalState(false, false); showToast("役割設定を更新しました", "success");
         }
         
         function loadDeviceSettings() { 
@@ -1424,7 +1662,7 @@
             const nameInput = document.getElementById('settingDeviceName');
             if(nameInput) {
                 deviceSettings.deviceName = nameInput.value.trim(); safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
-                showToast("デバイス名を保存しました", "success"); updateNumberingModeUI(); pushLocalState();
+                showToast("デバイス名を保存しました", "success"); updateNumberingModeUI(); pushLocalState(false, false);
             }
         };
 
@@ -1435,14 +1673,8 @@
             if (oldRegs !== newRegs) {
                 const msg = newRegs === 1 ? "稼働台数を【1台】に変更します。\nすべての残り在庫をメインレジ用に統合しますがよろしいですか？" : "稼働台数を【2台】に変更します。\n現在の残り在庫をメインレジとサブレジに半分ずつ分割しますがよろしいですか？";
                 if (confirm(msg)) {
-                    state.products.forEach(p => {
-                        const remaining = getProductTotalRemaining(p.id); const mainSold = getProductRoleSold(p.id, 'main'); const subSold = getProductRoleSold(p.id, 'sub');
-                        if (newRegs === 1) { p.mainAssigned = mainSold + remaining; p.subAssigned = subSold; } 
-                        else { const halfMain = Math.ceil(remaining / 2); const halfSub = Math.floor(remaining / 2); p.mainAssigned = mainSold + halfMain; p.subAssigned = subSold + halfSub; }
-                        p.stockUpdatedAt = Date.now();
-                    });
-                    deviceSettings.totalRegs = newRegs; safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings));
-                    saveDataLocalOnly(); pushLocalState(true); refreshAllUI(); showToast(`在庫を${newRegs}台運用として再配分しました`, "success");
+                    redistributeStockForRegs(newRegs);
+                    showToast(`在庫を${newRegs}台運用として再配分しました`, "success");
                 } else { document.getElementById('settingTotalRegs').value = oldRegs; return; }
             } else { deviceSettings.totalRegs = newRegs; safeSetLocal('posDeviceSettings_V42', JSON.stringify(deviceSettings)); }
             updateNumberingModeUI();
@@ -1454,6 +1686,7 @@
         function showModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         window.openTicketDetailModal = () => { renderFullTicketList(); showModal('ticketDetailModal'); };
+
         window.showToast = (msg, type = 'info') => {
             const c = document.getElementById('toastContainer'), el = document.createElement('div'); el.className = 'toast ' + type; el.textContent = msg; c.appendChild(el);
             setTimeout(() => { el.classList.add('hide'); setTimeout(() => el.remove(), 220); }, 2200);
@@ -1462,7 +1695,9 @@
         let unpContext = { type: null, targetId: null, value: "0" };
         window.openNumPad = (type, targetId, title, initialValue, isPassword, isDecimal) => {
             unpContext = { type, targetId, value: String(initialValue||""), isPassword, isDecimal };
-            document.getElementById('unpTitle').innerText = title; updateUnpDisplay(); showModal('universalNumPad');
+            document.getElementById('unpTitle').innerText = title; updateUnpDisplay();
+            document.getElementById('universalNumPad').classList.toggle('unp-dock-right', String(type).startsWith('setup'));
+            showModal('universalNumPad');
         };
         window.unpInput = (val) => {
             if(val === 'C') unpContext.value = ""; else if(val === '.') { if(unpContext.isDecimal && !unpContext.value.includes('.')) unpContext.value += '.'; }
@@ -1474,7 +1709,22 @@
             const val = unpContext.value; const pwd = safeGetLocal('posAdminPassword_V42');
             const isAuthorized = val === "0253" || (pwd && val === pwd) || (!pwd && val === "");
             if (unpContext.type === 'auth') { if(isAuthorized) { closeModal('universalNumPad'); showAdminPane(); } else { showToast('パスワードが異なります', 'error'); unpContext.value=""; updateUnpDisplay(); } }
-            else if (unpContext.type === 'setAuth') { safeSetLocal('posAdminPassword_V42', val); closeModal('universalNumPad'); updatePwdStatusUI(); showToast(val ? 'パスワードを設定しました' : 'パスワードを解除しました', 'success'); }
+            else if (unpContext.type === 'setAuth') { if (!val) { showToast('パスワードの設定は必須です。空にはできません', 'error'); return; } if (getEffectiveRole() === 'sub' && syncConfig.syncId) { closeModal('universalNumPad'); showToast('サブレジのパスワードはメインレジと共通です。メインレジで変更してください', 'error'); return; } safeSetLocal('posAdminPassword_V42', val); closeModal('universalNumPad'); updatePwdStatusUI(); pushAdminPassword(); showToast('パスワードを変更しました', 'success'); }
+            else if (unpContext.type === 'setupPwd1' || unpContext.type === 'setupPwd2') {
+                if (!val) { showToast('パスワードを入力してください', 'error'); return; }
+                const n = unpContext.type === 'setupPwd1' ? 1 : 2;
+                setupPwdVals[n] = val; setSetupDisplay('setupPwdDisplay' + n, val, '', true);
+                document.getElementById('mandatoryPwdError').innerText = '';
+                closeModal('universalNumPad');
+                if (n === 1) openSetupPad('setupPwd2');
+            }
+            else if (unpContext.type === 'setupCash') {
+                const v = safeNumber(val, NaN);
+                if (val === '' || isNaN(v) || v < 0) { showToast('0以上の金額を入力してください', 'error'); return; }
+                setSetupDisplay('setupCashDisplay', String(Math.floor(v)), '', false);
+                document.getElementById('setupCashDisplay').innerText = '¥' + safeFormat(Math.floor(v));
+                closeModal('universalNumPad');
+            }
             else if (unpContext.type === 'deleteAuth') { if(isAuthorized) { closeModal('universalNumPad'); executeDataDeletion(); } else { showToast('パスワードが異なります', 'error'); unpContext.value=""; updateUnpDisplay(); } }
             else if (unpContext.type === 'osmQty') { const qty = safeNumber(val); if(qty>0) setOsmQty(qty); closeModal('universalNumPad'); }
             else if (unpContext.type === 'newToppingPrice') { const pDiv = document.getElementById('newToppingPriceDisplay'); if (pDiv) { pDiv.innerText = `¥${safeFormat(val)}`; pDiv.setAttribute('data-price', safeNumber(val)); } closeModal('universalNumPad'); }
@@ -1492,10 +1742,6 @@
                 if(lg) localSalesLog = lg; 
             } catch(e){}
             if (!state.providedTickets) state.providedTickets = {}; 
-            if (state.products.length === 0) state.products = [ 
-                { id: 1, name: "特製焼きそば", price: 500, cost: 200, useStock: true, mainAssigned: 100, subAssigned: 0, stockUpdatedAt: Date.now(), stock: 100, active: true, useTopping: true, toppings: [{name:"目玉焼き", priceAdd:100}] },
-                { id: 2, name: "フランクフルト", price: 300, cost: 120, useStock: true, mainAssigned: 100, subAssigned: 0, stockUpdatedAt: Date.now(), stock: 100, active: true, useTopping: false, toppings: [] }
-            ];
             mergedSalesLog = [...localSalesLog]; refreshAllUI();
         }
         function saveDataLocalOnly() {
@@ -1507,12 +1753,27 @@
                 console.error('localStorage保存エラー:', e);
             }
         }
-        function refreshAllUI() { renderPOS(); renderCart(); if(systemMode === 'handover') renderHandover(); if(document.getElementById('adminPane').style.display === 'flex' || document.getElementById('adminPane').style.display === 'block') renderAdmin(); if(document.getElementById('ticketDetailModal').classList.contains('active')) renderFullTicketList(); }
+        function refreshAllUI() { renderPOS(); renderCart(); if(systemMode === 'handover') renderHandover(); if(document.getElementById('adminPane').style.display === 'flex' || document.getElementById('adminPane').style.display === 'block') renderAdmin(); if(document.getElementById('ticketDetailModal').classList.contains('active')) renderFullTicketList(); if(document.getElementById('providedListModal').classList.contains('active')) renderProvidedList(); }
 
         window.hoNumInput = (val) => {
             if (handoverSearchStr === "") handoverSearchStr = val; else handoverSearchStr += val;
             if (handoverSearchStr.length > 6) handoverSearchStr = handoverSearchStr.slice(0, 6);
             document.getElementById('hoSearchDisplay').innerText = escapeHtml(handoverSearchStr); document.getElementById('hoSearchDisplay').style.color = "var(--primary)"; renderHandover();
+        };
+        // 受け渡し画面の手動更新（自動更新は5分間隔のまま、必要なときだけ即時取得）
+        window.manualHandoverRefresh = async () => {
+            if (!syncConfig.enabled) { showToast("同期が開始されていません", "error"); return; }
+            if (isSyncing) { showToast("同期中です。少しお待ちください。", "info"); return; }
+            const btn = document.getElementById('btnHandoverRefresh');
+            isSyncing = true; btn.disabled = true; btn.innerText = '取得中...';
+            try {
+                if (safeGetLocal('syncPending_V42') === 'true') await pushLocalState();
+                const before = lastKnownUpdatedAt;
+                await pollSync();
+                renderHandover();
+                showToast(lastKnownUpdatedAt !== before ? "最新の注文を取得しました" : "すでに最新です", "success");
+            } catch (e) { showToast("取得に失敗しました。通信状況を確認してください", "error"); }
+            finally { isSyncing = false; btn.disabled = false; btn.innerText = '🔄 最新の注文を取得'; }
         };
         window.hoSearchClear = () => { handoverSearchStr = ""; document.getElementById('hoSearchDisplay').innerText = "未入力"; document.getElementById('hoSearchDisplay').style.color = "var(--text-side)"; renderHandover(); };
 
@@ -1854,9 +2115,62 @@
 
         window.closeReceipt = () => { closeModal('receiptModal'); refreshAllUI(); };
 
+        // ===== 提供済みの管理（取り消し対応） =====
+        // providedTickets の値: 正の数=提供した時刻 / 負の数=取り消した時刻 / true=旧形式（提供済み）
+        function provSigned(v) { return v === true ? 1 : (typeof v === 'number' ? v : 0); }
+        function isTicketProvided(l) {
+            const v = state.providedTickets ? state.providedTickets[`${l.ticket}_${l.timestamp}`] : undefined;
+            if (v !== undefined && v !== null) return provSigned(v) > 0;
+            return !!l.provided;
+        }
+        function mergeProvidedTickets(a, b) {
+            const out = { ...(a || {}) };
+            Object.keys(b || {}).forEach(k => { if (!(k in out) || Math.abs(provSigned(b[k])) >= Math.abs(provSigned(out[k]))) out[k] = b[k]; });
+            return out;
+        }
+
+        window.undoHandover = (ticket, timestamp) => {
+            if (!state.providedTickets) state.providedTickets = {};
+            const ticketKey = `${ticket}_${timestamp}`;
+            state.providedTickets[ticketKey] = -Date.now();
+            const lLog = localSalesLog.find(l => l.ticket === ticket && l.timestamp === timestamp); if (lLog) lLog.provided = false;
+            const mLog = mergedSalesLog.find(l => l.ticket === ticket && l.timestamp === timestamp); if (mLog) mLog.provided = false;
+            saveDataLocalOnly(); pushSingleHandover(ticketKey); refreshAllUI(); showToast(`No.${ticket} を未提供に戻しました`, "success");
+        };
+
+        // 提供済みの番号一覧（ここから戻す番号を選ぶ）
+        window.openProvidedListModal = () => { renderProvidedList(); showModal('providedListModal'); };
+        function renderProvidedList() {
+            const box = document.getElementById('providedListBody'); if (!box) return;
+            const fmt = (ms) => new Date(ms).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const rows = mergedSalesLog.filter(l => isTicketProvided(l)).map(l => {
+                const v = state.providedTickets ? state.providedTickets[`${l.ticket}_${l.timestamp}`] : undefined;
+                const hasTime = (typeof v === 'number' && v > 0);
+                return { l, t: hasTime ? v : l.timestamp, label: hasTime ? `提供 ${fmt(v)}` : `注文 ${l.time || ''}` };
+            }).sort((a, b) => b.t - a.t).slice(0, 50);
+            box.innerHTML = rows.length === 0
+                ? '<div style="text-align:center; padding:30px 0; color:var(--text-side); font-weight:800;">提供済みの注文はまだありません</div>'
+                : rows.map(({ l, label }) => {
+                    const items = (l.items || []).map(i => { const p = state.products.find(x => x.id === i.id); return `${escapeHtml(p ? p.name : '商品')}×${i.qty}`; }).join('、');
+                    return `<div style="display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--border);"><div style="font-weight:900; font-size:26px; min-width:76px;">${l.ticket}</div><div style="flex:1; min-width:0;"><div style="font-size:12px; font-weight:800; color:var(--text-side);">${label}</div><div style="font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${items}</div></div><button class="sys-btn" style="padding:10px 16px;" onclick="undoHandover(${l.ticket}, ${l.timestamp})">↩ 戻す</button></div>`;
+                }).join('');
+        }
+
+        window.setHandoverSortMode = (mode) => {
+            handoverSortMode = mode;
+            const bNum = document.getElementById('hoSortBtn_number'), bTime = document.getElementById('hoSortBtn_time');
+            if (bNum) bNum.classList.toggle('blue', mode === 'number');
+            if (bTime) bTime.classList.toggle('blue', mode === 'time');
+            renderHandover();
+        };
+
         window.renderHandover = () => {
             const grid = document.getElementById('handoverGrid'); if (!grid) return;
-            let activeOrders = mergedSalesLog.filter(l => !l.provided && !(state.providedTickets && state.providedTickets[`${l.ticket}_${l.timestamp}`])).sort((a,b) => a.ticket - b.ticket);
+            const bNum = document.getElementById('hoSortBtn_number'), bTime = document.getElementById('hoSortBtn_time');
+            if (bNum) bNum.classList.toggle('blue', handoverSortMode === 'number');
+            if (bTime) bTime.classList.toggle('blue', handoverSortMode === 'time');
+            let activeOrders = mergedSalesLog.filter(l => !isTicketProvided(l));
+            activeOrders = handoverSortMode === 'time' ? activeOrders.sort((a,b) => a.timestamp - b.timestamp) : activeOrders.sort((a,b) => a.ticket - b.ticket);
             if (handoverSearchStr !== "") { activeOrders = activeOrders.filter(l => l.ticket.toString().includes(handoverSearchStr)); }
             if (activeOrders.length === 0) { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:60px; font-size:22px; font-weight:900; color:var(--text-side);">待機中の注文が見つかりません。</div>'; return; }
             grid.innerHTML = activeOrders.map(order => {
@@ -1883,7 +2197,7 @@
         };
 
         window.executeHandover = (ticket, timestamp) => {
-            if (!state.providedTickets) state.providedTickets = {}; const ticketKey = `${ticket}_${timestamp}`; state.providedTickets[ticketKey] = true; 
+            if (!state.providedTickets) state.providedTickets = {}; const ticketKey = `${ticket}_${timestamp}`; state.providedTickets[ticketKey] = Date.now(); 
             const lLog = localSalesLog.find(l => l.ticket === ticket && l.timestamp === timestamp); if (lLog) lLog.provided = true;
             const mLog = mergedSalesLog.find(l => l.ticket === ticket && l.timestamp === timestamp); if (mLog) mLog.provided = true;
             saveDataLocalOnly(); pushSingleHandover(ticketKey); refreshAllUI(); closeModal('handoverConfirmModal'); showToast(`No.${ticket} を提供済みにしました`, "success");
@@ -1911,7 +2225,7 @@
                     toDeleteIds.forEach(id => { payload[`state/products/${id}`] = null; });
                     await safeFetch(`${syncUrlBase()}.json`, { method: 'PATCH', body: JSON.stringify(payload) });
                 }
-                pushLocalState(true);
+                pushLocalState(true, false);
                 renderAdmin();
                 showToast(`${removedCount}件の無効商品を削除しました`, "success");
             } else {
@@ -2022,8 +2336,14 @@
             if (!document.getElementById('cashCheckDenomList')) return;
             if (!document.getElementById('cashCheckDenomList').innerHTML) buildCashCheckDenomList();
 
-            const actualTotal = cashCheckDenoms.reduce((sum, d) => sum + (safeNumber(cashCheckCounts[d], 0) * d), 0);
             const floatDisp = document.getElementById('cashCheckFloatDisplay');
+            if (!cashCheckFloatInitialized) {
+                cashCheckFloatInitialized = true;
+                const stored = safeGetLocal('posStartingCashAmount_V42');
+                if (stored !== null && floatDisp) { floatDisp.setAttribute('data-val', stored); floatDisp.innerText = '¥' + safeFormat(safeNumber(stored, 0)); }
+            }
+
+            const actualTotal = cashCheckDenoms.reduce((sum, d) => sum + (safeNumber(cashCheckCounts[d], 0) * d), 0);
             const floatVal = safeNumber(floatDisp ? floatDisp.getAttribute('data-val') : 0, 0);
             const expected = floatVal + lastCashSalesTotal;
             const diff = actualTotal - expected;
@@ -2056,7 +2376,7 @@
             let addSub = splitCount > 1 ? (type === 'add' ? Math.floor(delta / 2) : Math.ceil(delta / 2)) : 0;
             
             p.mainAssigned = safeNumber(p.mainAssigned) + addMain; p.subAssigned = safeNumber(p.subAssigned) + addSub; p.stockUpdatedAt = Date.now();
-            saveDataLocalOnly(); pushLocalState(true); refreshAllUI(); closeModal('inventoryModal'); showToast(`在庫を ${actionStr} しました`, "success");
+            saveDataLocalOnly(); pushLocalState(true, false); refreshAllUI(); closeModal('inventoryModal'); showToast(`在庫を ${actionStr} しました`, "success");
         };
 
         document.getElementById('btnAddProduct').addEventListener('click', () => { 
@@ -2069,7 +2389,7 @@
                 const n = document.getElementById(`p_name_${p.id}`); const pr = document.getElementById(`price_display_${p.id}`); const c = document.getElementById(`cost_display_${p.id}`); const ac = document.getElementById(`p_active_${p.id}`); 
                 if(n) { p.name = n.value; p.price = safeNumber(pr.getAttribute('data-val')); p.cost = safeNumber(c.getAttribute('data-val')); p.useStock = true; p.active = ac.checked; } 
             }); 
-            saveDataLocalOnly(); pushLocalState(true); refreshAllUI(); showToast("商品情報を保存して同期しました", "success");
+            saveDataLocalOnly(); pushLocalState(true, false); refreshAllUI(); showToast("商品情報を保存して同期しました", "success");
         });
         
         // ▼ 修正: 個別削除時、クラウドへDELETEリクエストを発行して物理削除
@@ -2087,7 +2407,7 @@
                     await safeFetch(`${syncUrlBase()}/state/products/${id}.json`, { method: 'DELETE' });
                 }
                 
-                pushLocalState(true); 
+                pushLocalState(true, false); 
                 renderAdmin(); 
             } 
         };
@@ -2124,7 +2444,7 @@
         }
         window.removeToppingRow = function(i) { currentToppingEdit.splice(i, 1); renderToppingModalList(); }
         window.addToppingRow = function() { const nameEl = document.getElementById('newToppingName'), priceEl = document.getElementById('newToppingPriceDisplay'); if (!nameEl || !nameEl.value.trim()) { showToast("トッピング名を入力してください", "error"); return; } const priceAdd = safeNumber(priceEl.getAttribute('data-price')) || 0; currentToppingEdit.push({ name: nameEl.value.trim(), priceAdd: priceAdd }); nameEl.value = ""; priceEl.innerText = "¥0"; priceEl.setAttribute('data-price', 0); renderToppingModalList(); showToast("追加しました", "success"); }
-        window.saveToppingModal = function() { const p = state.products.find(pp => pp.id === toppingModalProductId); if (!p) return; p.useTopping = document.getElementById('toppingUseCheckbox').checked; p.toppings = JSON.parse(JSON.stringify(currentToppingEdit)); saveDataLocalOnly(); pushLocalState(true); renderAdmin(); closeModal('toppingModal'); showToast("設定を保存しました", "success"); }
+        window.saveToppingModal = function() { const p = state.products.find(pp => pp.id === toppingModalProductId); if (!p) return; p.useTopping = document.getElementById('toppingUseCheckbox').checked; p.toppings = JSON.parse(JSON.stringify(currentToppingEdit)); saveDataLocalOnly(); pushLocalState(true, false); renderAdmin(); closeModal('toppingModal'); showToast("設定を保存しました", "success"); }
 
         window.switchLogSource = (source) => {
             currentLogSource = source; 
@@ -2173,7 +2493,7 @@
             else {
                 let html = ''; const renderLimit = Math.min(viewLogs.length, 1000); 
                 for(let idx = 0; idx < renderLimit; idx++) {
-                    const l = viewLogs[idx]; const isProvided = l.provided || (state.providedTickets && state.providedTickets[`${l.ticket}_${l.timestamp}`]);
+                    const l = viewLogs[idx]; const isProvided = isTicketProvided(l);
                     let cost = 0; 
                     const itemsStr = l.items.map(i => { 
                         const baseName = getItemBaseName(i);
@@ -2203,7 +2523,7 @@
             if(filteredLogsForView.length === 0) { showToast("コピーするデータがありません", "error"); return; }
             let tsv = "日時\t取引ID\t整理券番号\t営業日\t決済方法\t売上金額\t原価合計\t想定利益\t購入商品詳細\t提供状態\t担当端末\n";
             filteredLogsForView.forEach(l => {
-                const isProvided = l.provided || (state.providedTickets && state.providedTickets[`${l.ticket}_${l.timestamp}`]); let cost = 0; const itemsStr = l.items.map(i => { const baseName = getItemBaseName(i); const p = state.products.find(x => x.name === baseName || x.id === i.id); const unitCost = i.cost !== undefined ? i.cost : (p ? p.cost : 0); cost += unitCost * i.qty; return `${baseName} x${i.qty}`; }).join(' / ');
+                const isProvided = isTicketProvided(l); let cost = 0; const itemsStr = l.items.map(i => { const baseName = getItemBaseName(i); const p = state.products.find(x => x.name === baseName || x.id === i.id); const unitCost = i.cost !== undefined ? i.cost : (p ? p.cost : 0); cost += unitCost * i.qty; return `${baseName} x${i.qty}`; }).join(' / ');
                 const profit = l.total - cost; const methodStr = l.method === 'cashless' ? 'PayPay' : '現金'; const provStr = isProvided ? '提供済' : '調理中'; const dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString('ja-JP') : l.time; const dayStr = l.timestamp ? new Date(l.timestamp).toLocaleDateString('ja-JP') : ''; const txId = `${l.deviceId}_${l.timestamp}_${l.ticket}`; 
                 
                 let devNameStr = '不明';
