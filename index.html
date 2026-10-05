@@ -1104,7 +1104,7 @@
 
         function loadSyncConfig() { 
             try { const s = JSON.parse(safeGetLocal('posSyncConfig_V42')); if(s) syncConfig = s; } catch(e){} 
-            if(!syncConfig.dbUrl) syncConfig.dbUrl = 'https://cash-register-system-c2831-default-rtdb.asia-southeast1.firebasedatabase.app';
+            if(!syncConfig.dbUrl) syncConfig.dbUrl = '';
             if(document.getElementById('syncDbUrlInput')) document.getElementById('syncDbUrlInput').value = syncConfig.dbUrl || ''; 
             if(document.getElementById('syncIdInput')) document.getElementById('syncIdInput').value = syncConfig.syncId || ''; 
             updateSyncStatusUI(); 
